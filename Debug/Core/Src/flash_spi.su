@@ -1,0 +1,34 @@
+../Core/Src/flash_spi.cpp:21:6:void flash::Read(settings_t*)	24	static
+../Core/Src/flash_spi.cpp:28:6:void flash::Write(settings_t)	32	static
+../Core/Src/flash_spi.cpp:47:9:uint8_t flash::W25qxx_Spi(uint8_t)	32	static
+../Core/Src/flash_spi.cpp:57:10:uint32_t flash::W25qxx_ReadID()	32	static
+../Core/Src/flash_spi.cpp:77:6:void flash::W25qxx_ReadUniqID()	32	static
+../Core/Src/flash_spi.cpp:92:6:void flash::W25qxx_WriteEnable()	16	static
+../Core/Src/flash_spi.cpp:101:6:void flash::W25qxx_WriteDisable()	16	static
+../Core/Src/flash_spi.cpp:166:6:void flash::W25qxx_WaitForWriteEnd()	16	static
+../Core/Src/flash_spi.cpp:182:9:uint8_t flash::Init(SPI_HandleTypeDef*, uint32_t, pins_spi_t, pins_spi_t, pins_spi_t, bool)	32	static
+../Core/Src/flash_spi.cpp:409:6:void flash::SetUsedInOS(bool)	16	static
+../Core/Src/flash_spi.cpp:414:6:void flash::W25qxx_Delay(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:422:6:void flash::W25qxx_EraseChip()	16	static
+../Core/Src/flash_spi.cpp:443:6:void flash::W25qxx_EraseSector(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:475:6:void flash::W25qxx_EraseBlock(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:508:10:uint32_t flash::W25qxx_PageToSector(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:514:10:uint32_t flash::W25qxx_PageToBlock(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:520:10:uint32_t flash::W25qxx_SectorToBlock(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:526:10:uint32_t flash::W25qxx_SectorToPage(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:532:10:uint32_t flash::W25qxx_BlockToPage(uint32_t)	16	static
+../Core/Src/flash_spi.cpp:538:9:uint8_t flash::W25qxx_IsEmptyPage(uint32_t, uint32_t)	296	static
+../Core/Src/flash_spi.cpp:583:9:uint8_t flash::W25qxx_IsEmptySector(uint32_t, uint32_t)	304	static
+../Core/Src/flash_spi.cpp:664:9:uint8_t flash::W25qxx_IsEmptyBlock(uint32_t, uint32_t)	304	static
+../Core/Src/flash_spi.cpp:745:6:void flash::W25qxx_WriteByte(uint8_t, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:775:6:void flash::W25qxx_WriteBytes(uint8_t*, uint32_t, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:786:6:void flash::W25qxx_WritePage(uint8_t*, uint32_t, uint32_t, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:828:6:void flash::W25qxx_WriteSector(uint8_t*, uint32_t, uint32_t, uint32_t)	48	static
+../Core/Src/flash_spi.cpp:859:6:void flash::W25qxx_WriteBlock(uint8_t*, uint32_t, uint32_t, uint32_t)	48	static
+../Core/Src/flash_spi.cpp:890:6:void flash::W25qxx_ReadByte(uint8_t*, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:916:6:void flash::W25qxx_ReadBytes(uint8_t*, uint32_t, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:956:6:void flash::W25qxx_ReadPage(uint8_t*, uint32_t, uint32_t, uint32_t)	24	static
+../Core/Src/flash_spi.cpp:1004:6:void flash::W25qxx_ReadSector(uint8_t*, uint32_t, uint32_t, uint32_t)	48	static
+../Core/Src/flash_spi.cpp:1035:6:void flash::W25qxx_ReadBlock(uint8_t*, uint32_t, uint32_t, uint32_t)	48	static
+../Core/Src/flash_spi.cpp:1066:1:flash::flash()	16	static
+../Core/Src/flash_spi.cpp:1070:1:flash::~flash()	16	static
