@@ -1,0 +1,110 @@
+type_data : 1 установки для IP
+			2 установки для настроек мотора
+			3 запрос всех настроек
+			4 запрос состояния
+			
+Обект с настройками IP
+	"obj" : {
+		"IP" : "",
+		"setIP": true,
+		"MAC" : "",
+		"setMAC": true,
+		"GATEWAY" : "",
+		"setGATEWAY": true,
+		"MASK" : "",
+		"setMASK": true,
+		"DNS" : "",
+		"setDNS": true,
+		"DHCP" : false,
+		"setDHCP": true
+	}
+
+Обект с настройками мотора
+	"obj" : {
+		"speed" : "",
+		"set_speed": true,
+		"set_start_speed": "",
+		"start_speed": true,
+		"accel" : "",
+		"set_accel": true,
+		"slow" : "",
+		"set_slow": true,
+		"step_stop" : "",
+		"set_step_stop": true,
+		"target" : "",
+		"set_target": true,
+		"time_out" : "",
+		"set_time_out": true,
+		"motor" : 0,
+		"set_motor": true,		
+		"cw_ccw" : 0,
+		"set_cw_ccw": true,
+		"rotation" : 0,
+		"set_rotation": true
+	
+	}
+
+Обект всех настроек ответ на хост
+{
+	"id": 2,
+	"name_device": "motor controller",
+	"type_data": 3,
+	"obj" : {
+		"IP" : "",
+		"MAC" : "",
+		"GATEWAY" : "",
+		"MASK" : "",
+		"DNS" : "",
+		"DHCP" : false,
+		"speed" : "",
+		"accel" : "",
+		"slow" : "",
+		"step_stop" : "",
+		"target" : "",
+		"time" : "",
+		"cw_ccw" : 0,
+		"rotation" : 0,
+		"version" : 
+	}
+}
+
+Обект ответа всех статусов
+{
+	"id": 2,
+	"name_device": "motor controller",
+	"type_data": 4,
+	"obj" : {
+		"l_dist" : "",
+		"stat_rotation" : "",
+		"stat_target" : "",
+		"sensor_pos" : ""
+	}
+}
+
+шаблон обекта от компютера
+{
+	"id": 2,
+	"name_device": "motor controller",
+	"type_data": 1,
+	"save_settings": true,
+	"obj" : {
+		"IP" : "",
+		"setIP": true,
+		"MAC" : "",
+		"setMAC": true,
+		"GATEWAY" : "",
+		"setGATEWAY": true,
+		"MASK" : "",
+		"setMASK": true,
+		"DNS" : "",
+		"setDNS": true,
+		"DHCP" : false,
+		"setDHCP": true
+	}
+}
+
+Обект для запроса всех статусов
+{	"id": 2, "name_device": "motor controller","type_data": 4, "save_settings": false, "obj" : {}}
+
+Обект для запроса всех настроек
+{	"id": 2, "name_device": "motor controller","type_data": 3,"save_settings": false,"obj" : {}}

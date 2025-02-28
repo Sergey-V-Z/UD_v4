@@ -1,0 +1,44 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+/Universal_Driver_hard/PWR_MOSFET/History
+/Universal_Driver_hard/Universal driver v2/History
+/Universal_Driver_hard/Universal_Driver/History
+
+Universal_Driver_soft/UniversalDriver_v2.1_extDriver/EWARM/UniversalDriver_v2.1/Obj/
+
+Universal_Driver_hard/Universal_Driver v3_ft/History/
+
+Universal_Driver_soft/UniversalDriver_v2.1_turn/EWARM/UniversalDriver_v2.1/Obj/
+/.metadata/
+
+Universal_Driver_soft/UD_v3.1_stepEnc/.settings/
