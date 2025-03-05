@@ -186,7 +186,7 @@ void MX_FREERTOS_Init(void) {
   mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
 
   /* definition and creation of Motor_pool */
-  osThreadDef(Motor_pool, motor_pool, osPriorityNormal, 0, 512);
+  osThreadDef(Motor_pool, motor_pool, osPriorityNormal, 0, 256);
   Motor_poolHandle = osThreadCreate(osThread(Motor_pool), NULL);
 
   /* definition and creation of ledTask */
@@ -194,7 +194,7 @@ void MX_FREERTOS_Init(void) {
   ledTaskHandle = osThreadCreate(osThread(ledTask), NULL);
 
   /* definition and creation of callTask */
-  osThreadDef(callTask, CallTask, osPriorityNormal, 0, 128);
+  osThreadDef(callTask, CallTask, osPriorityNormal, 0, 256);
   callTaskHandle = osThreadCreate(osThread(callTask), NULL);
 
   /* definition and creation of uart_task */
@@ -317,7 +317,7 @@ void motor_pool(void const * argument)
 	/* Infinite loop */
 	for (;;) {
 		//osDelay(1);
-		pMotor->AccelHandler();
+		//pMotor->AccelHandler();
 
 		//osDelayUntil(&tickcount, 1); // задача будет вызываься ровно через 1 милисекунду
 		osDelay(1);

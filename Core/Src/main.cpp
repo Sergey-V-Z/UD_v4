@@ -730,6 +730,11 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     		}
     	}
     }
+    // Обработка прерывания таймера генерации шагов
+    if (htim->Instance == TIM1 && pMotor != nullptr) {
+      pMotor->handleTimerInterrupt();
+    }
+
 }
 
 
@@ -823,6 +828,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
+
+  // Обработка прерывания таймера генерации шагов
+  if (htim->Instance == TIM1 && pMotor != nullptr) {
+    //pMotor->handleTimerInterrupt();
+  }
 
   if (htim->Instance == TIM4) {
     //HAL_IncTick();

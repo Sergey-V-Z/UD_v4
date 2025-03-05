@@ -13,10 +13,10 @@
 ../Core/Src/main.cpp:539:6:)	56	static,ignoring_inline_asm
 ../Core/Src/main.cpp:613:6:void HAL_UART_TxCpltCallback(UART_HandleTypeDef*)	16	static
 ../Core/Src/main.cpp:619:6:void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef*)	16	static
-../Core/Src/main.cpp:736:6:void HAL_GPIO_EXTI_Callback(uint16_t)	16	static
-../Core/Src/main.cpp:747:6:void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef*, uint16_t)	56	static
-../Core/Src/main.cpp:817:6:void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef*)	16	static
-../Core/Src/main.cpp:844:6:void Error_Handler()	8	static,ignoring_inline_asm
-../Core/Src/main.cpp:854:1:void __static_initialization_and_destruction_0(int, int)	32	static
-../Core/Src/main.cpp:854:1:cpp)	8	static
-../Core/Src/main.cpp:854:1:cpp)	8	static
+../Core/Src/main.cpp:741:6:void HAL_GPIO_EXTI_Callback(uint16_t)	16	static
+../Core/Src/main.cpp:752:6:void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef*, uint16_t)	56	static
+../Core/Src/main.cpp:822:6:void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef*)	16	static
+../Core/Src/main.cpp:854:6:void Error_Handler()	8	static,ignoring_inline_asm
+../Core/Src/main.cpp:864:1:void __static_initialization_and_destruction_0(int, int)	32	static
+../Core/Src/main.cpp:864:1:cpp)	8	static
+../Core/Src/main.cpp:864:1:cpp)	8	static

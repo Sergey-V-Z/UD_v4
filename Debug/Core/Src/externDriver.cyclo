@@ -1,61 +1,67 @@
 ../Core/Src/externDriver.cpp:12:8:double extern_driver::calculateAccelStep(double)	5
 ../Core/Src/externDriver.cpp:48:10:uint32_t extern_driver::calculateBrakingDistance(uint32_t)	1
 ../Core/Src/externDriver.cpp:75:6:void extern_driver::Init()	6
-../Core/Src/externDriver.cpp:140:17:driver_status_t extern_driver::getDriverStatus()	2
-../Core/Src/externDriver.cpp:147:10:uint32_t extern_driver::getLastDriverCheck()	1
-../Core/Src/externDriver.cpp:151:6:void extern_driver::checkDriverStatus()	3
-../Core/Src/externDriver.cpp:166:6:bool extern_driver::isDriverStatusValid()	1
-../Core/Src/externDriver.cpp:173:6:bool extern_driver::start(uint32_t, dir)	27
-../Core/Src/externDriver.cpp:325:6:bool extern_driver::startForCall(dir)	14
-../Core/Src/externDriver.cpp:390:6:void extern_driver::stop(statusTarget_t)	2
-../Core/Src/externDriver.cpp:456:6:void extern_driver::slowdown()	1
-../Core/Src/externDriver.cpp:462:6:void extern_driver::removeBreak(bool)	1
-../Core/Src/externDriver.cpp:472:6:void extern_driver::SensHandler(uint16_t)	11
-../Core/Src/externDriver.cpp:670:6:void extern_driver::AccelHandler()	9
-../Core/Src/externDriver.cpp:787:6:void extern_driver::checkEncoderDirection()	7
-../Core/Src/externDriver.cpp:821:6:void extern_driver::checkEncoderMotion()	4
-../Core/Src/externDriver.cpp:834:6:bool extern_driver::Calibration_pool()	23
-../Core/Src/externDriver.cpp:989:6:void extern_driver::CallStart()	1
-../Core/Src/externDriver.cpp:994:6:void extern_driver::SetSpeed(uint32_t)	6
-../Core/Src/externDriver.cpp:1031:6:void extern_driver::SetStartSpeed(uint32_t)	3
-../Core/Src/externDriver.cpp:1043:6:void extern_driver::SetAcceleration(uint32_t)	1
-../Core/Src/externDriver.cpp:1048:6:void extern_driver::SetSlowdown(uint32_t)	1
-../Core/Src/externDriver.cpp:1054:6:void extern_driver::setTimeOut(uint32_t)	1
-../Core/Src/externDriver.cpp:1058:6:void extern_driver::SetMode(mode_rotation_t)	2
-../Core/Src/externDriver.cpp:1068:6:void extern_driver::Parameter_update()	1
-../Core/Src/externDriver.cpp:1078:6:void extern_driver::SetDirection(dir)	1
-../Core/Src/externDriver.cpp:1084:10:uint32_t extern_driver::getAcceleration()	1
-../Core/Src/externDriver.cpp:1088:10:uint32_t extern_driver::getSlowdown()	1
-../Core/Src/externDriver.cpp:1092:10:uint32_t extern_driver::getSpeed()	1
-../Core/Src/externDriver.cpp:1098:10:uint32_t extern_driver::getStartSpeed()	1
-../Core/Src/externDriver.cpp:1104:10:uint32_t extern_driver::getTimeOut()	1
-../Core/Src/externDriver.cpp:1108:7:pos_t extern_driver::get_pos()	5
-../Core/Src/externDriver.cpp:1128:5:dir extern_driver::getStatusDirect()	1
-../Core/Src/externDriver.cpp:1132:13:statusMotor extern_driver::getStatusRotation()	1
-../Core/Src/externDriver.cpp:1136:10:uint16_t extern_driver::getRPM()	1
-../Core/Src/externDriver.cpp:1140:17:mode_rotation_t extern_driver::getMode()	1
-../Core/Src/externDriver.cpp:1144:16:statusTarget_t extern_driver::getStatusTarget()	1
-../Core/Src/externDriver.cpp:1148:6:void extern_driver::StartDebounceTimer(uint16_t)	9
-../Core/Src/externDriver.cpp:1174:6:void extern_driver::HandleDebounceTimeout()	5
-../Core/Src/externDriver.cpp:1197:6:bool extern_driver::validatePointNumber(uint32_t)	1
-../Core/Src/externDriver.cpp:1201:6:void extern_driver::updateCurrentPosition(uint32_t)	1
-../Core/Src/externDriver.cpp:1206:6:bool extern_driver::saveCurrentPositionAsPoint(uint32_t)	4
-../Core/Src/externDriver.cpp:1218:10:uint32_t extern_driver::getCurrentSteps()	3
-../Core/Src/externDriver.cpp:1248:6:bool extern_driver::gotoPoint(uint32_t)	5
-../Core/Src/externDriver.cpp:1265:6:bool extern_driver::gotoLSwitch(uint8_t)	14
-../Core/Src/externDriver.cpp:1356:6:bool extern_driver::validatePosition(uint32_t)	4
-../Core/Src/externDriver.cpp:1366:10:uint32_t extern_driver::getMaxPosition() const	1
-../Core/Src/externDriver.cpp:1371:10:uint32_t extern_driver::getMinPosition() const	1
-../Core/Src/externDriver.cpp:1375:6:void extern_driver::setPoint(uint32_t, uint32_t)	1
-../Core/Src/externDriver.cpp:1379:6:bool extern_driver::gotoPosition(uint32_t)	5
-../Core/Src/externDriver.cpp:1405:6:bool extern_driver::gotoInfinity()	4
-../Core/Src/externDriver.cpp:1431:6:bool extern_driver::isCalibrated()	1
-../Core/Src/externDriver.cpp:1436:6:void extern_driver::InitTim()	1
-../Core/Src/externDriver.cpp:1440:8:double extern_driver::map(double, double, double, double, double)	1
-../Core/Src/externDriver.cpp:1450:10:uint16_t extern_driver::map_ARRFromPercent(uint16_t)	3
-../Core/Src/externDriver.cpp:1481:10:uint16_t extern_driver::map_PercentFromARR(uint16_t)	5
-../Core/Src/externDriver.cpp:1514:6:bool extern_driver::waitForStop(uint32_t)	3
-../Core/Src/externDriver.cpp:1526:7:void extern_driver::ChangeTimerMode(TIM_HandleTypeDef*, uint32_t)	1
-../Core/Src/externDriver.cpp:1540:1:extern_driver::~extern_driver()	1
-../Core/Src/externDriver.cpp:1544:1:extern_driver::extern_driver(settings_t*, TIM_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, TIM_HandleTypeDef*, TIM_HandleTypeDef*)	1
+../Core/Src/externDriver.cpp:158:17:driver_status_t extern_driver::getDriverStatus()	2
+../Core/Src/externDriver.cpp:165:10:uint32_t extern_driver::getLastDriverCheck()	1
+../Core/Src/externDriver.cpp:169:6:void extern_driver::checkDriverStatus()	3
+../Core/Src/externDriver.cpp:184:6:bool extern_driver::isDriverStatusValid()	1
+../Core/Src/externDriver.cpp:191:6:bool extern_driver::start(uint32_t, dir)	36
+../Core/Src/externDriver.cpp:359:6:bool extern_driver::startForCall(dir)	17
+../Core/Src/externDriver.cpp:435:6:void extern_driver::stop(statusTarget_t)	2
+../Core/Src/externDriver.cpp:502:6:void extern_driver::slowdown()	3
+../Core/Src/externDriver.cpp:517:6:void extern_driver::removeBreak(bool)	1
+../Core/Src/externDriver.cpp:527:6:void extern_driver::SensHandler(uint16_t)	11
+../Core/Src/externDriver.cpp:725:6:void extern_driver::AccelHandler()	9
+../Core/Src/externDriver.cpp:842:6:void extern_driver::checkEncoderDirection()	7
+../Core/Src/externDriver.cpp:876:6:void extern_driver::checkEncoderMotion()	4
+../Core/Src/externDriver.cpp:889:6:bool extern_driver::Calibration_pool()	23
+../Core/Src/externDriver.cpp:1044:6:void extern_driver::CallStart()	1
+../Core/Src/externDriver.cpp:1049:6:void extern_driver::SetSpeed(uint32_t)	9
+../Core/Src/externDriver.cpp:1087:6:void extern_driver::SetStartSpeed(uint32_t)	3
+../Core/Src/externDriver.cpp:1099:6:void extern_driver::SetAcceleration(uint32_t)	1
+../Core/Src/externDriver.cpp:1104:6:void extern_driver::SetSlowdown(uint32_t)	1
+../Core/Src/externDriver.cpp:1110:6:void extern_driver::setTimeOut(uint32_t)	1
+../Core/Src/externDriver.cpp:1115:6:void extern_driver::SetMode(mode_rotation_t)	6
+../Core/Src/externDriver.cpp:1174:6:void extern_driver::Parameter_update()	1
+../Core/Src/externDriver.cpp:1184:6:void extern_driver::SetDirection(dir)	1
+../Core/Src/externDriver.cpp:1190:10:uint32_t extern_driver::getAcceleration()	1
+../Core/Src/externDriver.cpp:1194:10:uint32_t extern_driver::getSlowdown()	1
+../Core/Src/externDriver.cpp:1198:10:uint32_t extern_driver::getSpeed()	1
+../Core/Src/externDriver.cpp:1204:10:uint32_t extern_driver::getStartSpeed()	1
+../Core/Src/externDriver.cpp:1210:10:uint32_t extern_driver::getTimeOut()	1
+../Core/Src/externDriver.cpp:1214:7:pos_t extern_driver::get_pos()	5
+../Core/Src/externDriver.cpp:1234:5:dir extern_driver::getStatusDirect()	1
+../Core/Src/externDriver.cpp:1238:13:statusMotor extern_driver::getStatusRotation()	1
+../Core/Src/externDriver.cpp:1242:10:uint16_t extern_driver::getRPM()	1
+../Core/Src/externDriver.cpp:1246:17:mode_rotation_t extern_driver::getMode()	1
+../Core/Src/externDriver.cpp:1250:16:statusTarget_t extern_driver::getStatusTarget()	1
+../Core/Src/externDriver.cpp:1254:6:void extern_driver::StartDebounceTimer(uint16_t)	9
+../Core/Src/externDriver.cpp:1280:6:void extern_driver::HandleDebounceTimeout()	5
+../Core/Src/externDriver.cpp:1303:6:bool extern_driver::validatePointNumber(uint32_t)	1
+../Core/Src/externDriver.cpp:1307:6:void extern_driver::updateCurrentPosition(uint32_t)	1
+../Core/Src/externDriver.cpp:1312:6:bool extern_driver::saveCurrentPositionAsPoint(uint32_t)	4
+../Core/Src/externDriver.cpp:1324:10:uint32_t extern_driver::getCurrentSteps()	3
+../Core/Src/externDriver.cpp:1354:6:bool extern_driver::gotoPoint(uint32_t)	5
+../Core/Src/externDriver.cpp:1371:6:bool extern_driver::gotoLSwitch(uint8_t)	23
+../Core/Src/externDriver.cpp:1478:6:bool extern_driver::validatePosition(uint32_t)	4
+../Core/Src/externDriver.cpp:1488:10:uint32_t extern_driver::getMaxPosition() const	1
+../Core/Src/externDriver.cpp:1493:10:uint32_t extern_driver::getMinPosition() const	1
+../Core/Src/externDriver.cpp:1497:6:void extern_driver::setPoint(uint32_t, uint32_t)	1
+../Core/Src/externDriver.cpp:1501:6:bool extern_driver::gotoPosition(uint32_t)	5
+../Core/Src/externDriver.cpp:1527:6:bool extern_driver::gotoInfinity()	4
+../Core/Src/externDriver.cpp:1553:6:bool extern_driver::isCalibrated()	1
+../Core/Src/externDriver.cpp:1558:6:void extern_driver::InitTim()	1
+../Core/Src/externDriver.cpp:1562:8:double extern_driver::map(double, double, double, double, double)	1
+../Core/Src/externDriver.cpp:1572:10:uint16_t extern_driver::map_ARRFromPercent(uint16_t)	3
+../Core/Src/externDriver.cpp:1603:10:uint16_t extern_driver::map_PercentFromARR(uint16_t)	5
+../Core/Src/externDriver.cpp:1636:6:bool extern_driver::waitForStop(uint32_t)	3
+../Core/Src/externDriver.cpp:1648:7:void extern_driver::ChangeTimerMode(TIM_HandleTypeDef*, uint32_t)	1
+../Core/Src/externDriver.cpp:1663:6:void extern_driver::calculateTimerFrequency()	8
+../Core/Src/externDriver.cpp:1699:10:uint32_t extern_driver::calculateAccelSteps()	7
+../Core/Src/externDriver.cpp:1743:10:uint32_t extern_driver::calculateBrakingSteps()	5
+../Core/Src/externDriver.cpp:1785:6:void extern_driver::calculateAccelTable(uint32_t)	10
+../Core/Src/externDriver.cpp:1837:6:void extern_driver::calculateDecelTable(uint32_t)	8
+../Core/Src/externDriver.cpp:1887:6:void extern_driver::handleTimerInterrupt()	19
+../Core/Src/externDriver.cpp:1939:1:extern_driver::~extern_driver()	1
+../Core/Src/externDriver.cpp:1943:1:extern_driver::extern_driver(settings_t*, TIM_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, TIM_HandleTypeDef*, TIM_HandleTypeDef*)	1
 C:\ST\STM32CubeIDE_1.17.0\STM32CubeIDE\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.12.3.rel1.win32_1.1.0.202410251130\tools\bin/../lib/gcc/arm-none-eabi/12.3.1/../../../../arm-none-eabi/include/c++/12.3.1/bits/stl_algobase.h:254:5:constexpr const _Tp& std::max(const _Tp&, const _Tp&) [with _Tp = long unsigned int]	2

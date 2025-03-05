@@ -105,9 +105,25 @@ void extern_driver::Init() {
 		}
  	}
 
+
+    // Рассчитываем частоту тактирования таймера
+    calculateTimerFrequency();
+
     TimFrequencies->Instance->ARR = MinSpeed;
     //Speed_Call = (uint16_t) map(950, 1, 1000, MinSpeed, MaxSpeed);
     Speed_Call = (uint16_t) map_ARRFromPercent(950);
+
+    // Инициализация переменных для работы с таблицами
+    rampTables.accelSteps = 0;
+    rampTables.decelSteps = 0;
+    rampTables.currentStep = 0;
+
+    // Рассчитываем количество шагов, необходимых для торможения
+    uint32_t brakingSteps = calculateBrakingSteps();
+    uint32_t accelSteps = calculateAccelSteps();
+    // Пересчитываем таблицы разгона и торможения
+    calculateAccelTable(accelSteps);
+    calculateDecelTable(brakingSteps);
 
     Status = statusMotor::STOPPED;
     FeedbackType = fb::ENCODER;
@@ -119,12 +135,14 @@ void extern_driver::Init() {
         DIRECT_CCW
     }
 
+    // Инициализация таймера энкодера
     __HAL_TIM_SET_COUNTER(TimEncoder, 0);
     HAL_TIM_Encoder_Start(TimEncoder, TIM_CHANNEL_ALL);
     HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_3);
     HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_4);
     HAL_TIM_Base_Start_IT(TimEncoder);
 
+    // Инициализация таймера шагов
     __HAL_TIM_SET_COUNTER(TimCountAllSteps, 0);
     //HAL_TIM_Base_Start_IT(TimCountAllSteps);
     //HAL_TIM_Encoder_Start(TimEncoder, TIM_CHANNEL_ALL);
@@ -258,21 +276,35 @@ bool extern_driver::start(uint32_t steps, dir d) {
         countErrDir = 3;
         StatusTarget = statusTarget_t::inProgress;
 
-        uint32_t SlowdownDistance = 50; //steps/10; //1%
+        //uint32_t SlowdownDistance = 50; //steps/10; //1%
+
+        // Рассчитываем количество шагов, необходимых для торможения
+        uint32_t brakingSteps = calculateBrakingSteps();
+        uint32_t accelSteps = calculateAccelSteps();
+        // Пересчитываем таблицы разгона и торможения
+        calculateAccelTable(accelSteps);
+        calculateDecelTable(brakingSteps);
+
+        // Сбрасываем счетчик шагов таблицы
+        rampTables.currentStep = 0;
+        //rampTables.isAccelerating = true;
+        //rampTables.isDecelerating = false;
 
         switch (settings->mod_rotation) {
         	case calibration_enc:
         	case step_by_meter_enc_intermediate:
         	//case step_by_meter_enc_limit:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[0]);
+        		//__HAL_TIM_SET_COMPARE(TimFrequencies, ChannelClock, rampTables.accelTable[0] / 2);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
         		// обработать направление. если двигаться в CCW 0->1 то все ок но если двигаться CW 1->0 то шаги для торможения нужно прибавить
 				__HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
         		if(settings->Direct == dir::CCW){
-        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps - SlowdownDistance);
+        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps - brakingSteps);
         		} else {
-        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps + SlowdownDistance);
+        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps + brakingSteps);
         		}
 				__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, steps);
         		Status = statusMotor::ACCEL;
@@ -283,14 +315,15 @@ bool extern_driver::start(uint32_t steps, dir d) {
         	case step_by_meter_timer_intermediate:
         	//case step_by_meter_timer_limit:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[0]);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
 				//__HAL_TIM_SET_COUNTER(TimCountAllSteps, 0);
 				__HAL_TIM_SET_AUTORELOAD(TimCountAllSteps, 0xffff);
         		if(settings->Direct == dir::CCW){
-        			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_1, steps - SlowdownDistance);
+        			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_1, steps - brakingSteps);
         		} else {
-        			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_1, steps + SlowdownDistance);
+        			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_1, steps + brakingSteps);
         		}
 				__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_2, steps);
         		Status = statusMotor::ACCEL;
@@ -300,7 +333,8 @@ bool extern_driver::start(uint32_t steps, dir d) {
         	case bldc_limit:
         	case bldc_inf:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, settings->Speed);
         		Status = statusMotor::MOTION;
         		break;
         	}
@@ -313,7 +347,7 @@ bool extern_driver::start(uint32_t steps, dir d) {
         //STM_LOG("Speed start: %d", (int)(TimFrequencies->Instance->ARR));
         STM_LOG("Start motor.");
 
-        HAL_TIM_OC_Start(TimFrequencies, ChannelClock);
+        HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
     } else {
@@ -328,6 +362,9 @@ bool extern_driver::startForCall(dir d) {
     if ((Status == statusMotor::STOPPED) ||
     		((settings->mod_rotation == mode_rotation_t::calibration_enc) && (settings->mod_rotation == mode_rotation_t::calibration_timer)))
     {
+
+        // Сбрасываем счетчик шагов таблицы
+        rampTables.currentStep = 0;
 
     	// настроим и запустим двигатель
     	settings->Direct = d;
@@ -361,7 +398,15 @@ bool extern_driver::startForCall(dir d) {
 			DIRECT_CW
 		}
 
-		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        // Рассчитываем количество шагов, необходимых для торможения
+        uint32_t brakingSteps = calculateBrakingSteps();
+        uint32_t accelSteps = calculateAccelSteps();
+        // Пересчитываем таблицы разгона и торможения
+        calculateAccelTable(accelSteps);
+        calculateDecelTable(brakingSteps);
+
+		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[0]);
+		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
 		if(settings->mod_rotation == mode_rotation_t::calibration_timer)
 		{
@@ -378,7 +423,7 @@ bool extern_driver::startForCall(dir d) {
 		}
 
         Status = statusMotor::ACCEL;
-        HAL_TIM_OC_Start(TimFrequencies, ChannelClock);
+        HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
     } else {
@@ -390,7 +435,7 @@ bool extern_driver::startForCall(dir d) {
 void extern_driver::stop(statusTarget_t status) {
     ignore_sensors = false;
 
-    HAL_TIM_OC_Stop(TimFrequencies, ChannelClock);
+    HAL_TIM_OC_Stop_IT(TimFrequencies, ChannelClock);
     //permission_calibrate = false;
     //permission_findHome = false;
 
@@ -453,10 +498,20 @@ void extern_driver::stop(statusTarget_t status) {
  * Функция для начала торможения двигателя.
  * Инициирует процесс торможения в зависимости от режима работы.
  */
+// Модификация метода slowdown() для использования таблицы торможения
 void extern_driver::slowdown() {
+    // Если двигатель уже тормозит или остановлен, ничего не делаем
+    if (Status == statusMotor::BRAKING || Status == statusMotor::STOPPED) return;
 
-	Status = statusMotor::BRAKING;
+    // Сбрасываем счетчик шагов таблицы
+    rampTables.currentStep = 0;
+    //rampTables.isAccelerating = false;
+    //rampTables.isDecelerating = true;
 
+    // Устанавливаем статус торможения
+    Status = statusMotor::BRAKING;
+
+    STM_LOG("Motor slowdown with deceleration table (%u steps)", rampTables.decelSteps);
 }
 
 void extern_driver::removeBreak(bool status) {
@@ -1016,7 +1071,8 @@ void extern_driver::SetSpeed(uint32_t percent) {
     	case step_inf:
     	case bldc_inf:
 		{
-			__HAL_TIM_SET_AUTORELOAD(TimFrequencies,(uint32_t) map_ARRFromPercent(percent));
+			//__HAL_TIM_SET_AUTORELOAD(TimFrequencies,(uint32_t) map_ARRFromPercent(percent));
+			SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, (uint32_t) map_ARRFromPercent(percent));
 			break;
 		}
 		default:
@@ -1055,12 +1111,62 @@ void extern_driver::setTimeOut(uint32_t time) {
 	settings->TimeOut = time;
 }
 
+// Модифицированный метод SetMode() с пересчетом частоты
 void extern_driver::SetMode(mode_rotation_t mod) {
     if (!settings) {
         STM_LOG("Error: settings is null");
         return;
     }
-	settings->mod_rotation = mod;
+
+    // Запоминаем текущий режим для сравнения
+    mode_rotation_t oldMode = settings->mod_rotation;
+
+    // Устанавливаем новый режим
+    settings->mod_rotation = mod;
+
+    // Если режим изменился, обновляем параметры таймера и пересчитываем частоты
+    if (oldMode != mod) {
+        // Обновляем предделитель таймера и диапазон скоростей
+        switch (mod) {
+            case step_by_meter_enc_intermediate:
+            case step_by_meter_timer_intermediate:
+            case step_inf:
+            {
+                TimFrequencies->Instance->PSC = 399;
+                MaxSpeed = 50;
+                MinSpeed = 13000;
+                break;
+            }
+            case bldc_limit:
+            case bldc_inf:
+            {
+                TimFrequencies->Instance->PSC = 200-1;
+                MaxSpeed = 100;
+                MinSpeed = 2666;
+                break;
+            }
+            default:
+            {
+                TimFrequencies->Instance->PSC = 399;
+                MaxSpeed = 50;
+                MinSpeed = 13000;
+                break;
+            }
+        }
+
+        // Пересчитываем частоту тактирования таймера
+        calculateTimerFrequency();
+
+        // Рассчитываем количество шагов, необходимых для торможения
+        uint32_t brakingSteps = calculateBrakingSteps();
+        uint32_t accelSteps = calculateAccelSteps();
+        // Пересчитываем таблицы разгона и торможения
+        calculateAccelTable(accelSteps);
+        calculateDecelTable(brakingSteps);
+
+
+        STM_LOG("Mode changed to %d, timer parameters updated", (int)mod);
+    }
 }
 
 
@@ -1293,6 +1399,9 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
 
 		}
 
+        // Сбрасываем счетчик шагов таблицы
+        rampTables.currentStep = 0;
+
         ignore_sensors = true;
         vibration_start_time = HAL_GetTick();
         StatusTarget = statusTarget_t::inProgress;
@@ -1304,12 +1413,23 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
 			DIRECT_CW
 		}
 
+        // Рассчитываем количество шагов, необходимых для торможения
+        uint32_t brakingSteps = calculateBrakingSteps();
+        uint32_t accelSteps = calculateAccelSteps();
+        // Пересчитываем таблицы разгона и торможения
+        calculateAccelTable(accelSteps);
+        calculateDecelTable(brakingSteps);
+
+        // Сбрасываем счетчик шагов таблицы
+        rampTables.currentStep = 0;
+
         switch (settings->mod_rotation) {
         	case calibration_enc:
         	case step_by_meter_enc_intermediate:
         	//case step_by_meter_enc_limit:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
     			//__HAL_TIM_SET_COUNTER(TimEncoder, 0);
     			__HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
@@ -1323,7 +1443,8 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         	case step_by_meter_timer_intermediate:
         	//case step_by_meter_timer_limit:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
     			//__HAL_TIM_SET_COUNTER(TimCountAllSteps, 0);
     			__HAL_TIM_SET_AUTORELOAD(TimCountAllSteps, 0xffff);
@@ -1336,7 +1457,8 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         	case bldc_limit:
         	case bldc_inf:
         	{
-        		__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
+        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, settings->StartSpeed);
         		Status = statusMotor::MOTION;
         		break;
         	}
@@ -1346,7 +1468,7 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         	}
         }
 
-        HAL_TIM_OC_Start(TimFrequencies, ChannelClock);
+        HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
 	}
@@ -1535,6 +1657,283 @@ void  extern_driver::ChangeTimerMode(TIM_HandleTypeDef *htim, uint32_t Mode)
 
     // Перезапустить таймер
     HAL_TIM_Base_Start(htim);
+}
+
+// Реализация метода расчета частоты тактирования таймера
+void extern_driver::calculateTimerFrequency() {
+    uint32_t timerClockFreq;
+
+    // Определяем, к какой шине подключен таймер (APB1 или APB2)
+    // TIM1 и TIM8-TIM11 обычно на APB2, остальные на APB1
+    if (TimFrequencies->Instance == TIM1 ||
+        TimFrequencies->Instance == TIM8 ||
+        TimFrequencies->Instance == TIM9 ||
+        TimFrequencies->Instance == TIM10 ||
+        TimFrequencies->Instance == TIM11) {
+        // Получаем частоту шины APB2
+        timerClockFreq = HAL_RCC_GetPCLK2Freq();
+
+        // Если делитель APB2 не равен 1, частота тактирования таймера удваивается
+        if ((RCC->CFGR & RCC_CFGR_PPRE2) != 0) {
+            timerClockFreq *= 2;
+        }
+    } else {
+        // Получаем частоту шины APB1
+        timerClockFreq = HAL_RCC_GetPCLK1Freq();
+
+        // Если делитель APB1 не равен 1, частота тактирования таймера удваивается
+        if ((RCC->CFGR & RCC_CFGR_PPRE1) != 0) {
+            timerClockFreq *= 2;
+        }
+    }
+
+    // Учитываем предделитель таймера
+    uint32_t prescaler = TimFrequencies->Instance->PSC + 1;
+    timerTickFreq = timerClockFreq / prescaler;
+
+    STM_LOG("Timer frequency calculated: %lu Hz (Clock: %lu Hz, Prescaler: %lu)",
+            timerTickFreq, timerClockFreq, prescaler);
+}
+
+// Расчет количества шагов для ускорения
+uint32_t extern_driver::calculateAccelSteps() {
+    // Получаем начальную и целевую скорости
+    uint32_t startARR = settings->StartSpeed;
+    uint32_t targetARR = settings->Speed;
+
+    // Проверка соответствия значений диапазонам
+    if (startARR < MaxSpeed) startARR = MaxSpeed;
+    if (startARR > MinSpeed) startARR = MinSpeed;
+    if (targetARR < MaxSpeed) targetARR = MaxSpeed;
+    if (targetARR > MinSpeed) targetARR = MinSpeed;
+
+    // Преобразуем ARR в частоту (Гц) с использованием предварительно рассчитанной частоты
+    float initialFreq = static_cast<float>(timerTickFreq) / (startARR + 1);   // Начальная скорость
+    float finalFreq = static_cast<float>(timerTickFreq) / (targetARR + 1);    // Целевая скорость
+
+    // Рассчитываем количество шагов для разгона на основе разницы скоростей
+    // Используем формулу: s = (v_final^2 - v_initial^2) / (2 * acceleration)
+    float v_initial = initialFreq / 1000.0f;  // Нормализуем для расчета
+    float v_final = finalFreq / 1000.0f;      // Нормализуем для расчета
+    float acceleration = settings->Accel / 10000.0f;  // Коэффициент ускорения
+
+    // Рассчитываем количество шагов (округляем вверх)
+    uint32_t accelSteps = static_cast<uint32_t>(
+        (powf(v_final, 2) - powf(v_initial, 2)) / (2 * acceleration) + 0.5f
+    );
+
+    // Минимальное безопасное значение
+    if (accelSteps < 20U) {
+        accelSteps = 20U;
+    }
+
+    // Ограничиваем количество шагов размером буфера таблицы
+    if (accelSteps > MAX_RAMP_STEPS) {
+        accelSteps = MAX_RAMP_STEPS;
+        STM_LOG("Warning: Acceleration steps limited to %d (buffer size)", MAX_RAMP_STEPS);
+    }
+
+    STM_LOG("Calculated acceleration steps: %lu (initial freq: %f Hz, final freq: %f Hz)",
+            accelSteps, initialFreq, finalFreq);
+
+    return accelSteps;
+}
+
+// Обновленный метод расчета количества шагов для торможения с использованием целевой скорости
+uint32_t extern_driver::calculateBrakingSteps() {
+    // Получаем целевую скорость из настроек, а не текущее значение ARR
+    uint32_t targetARR = settings->Speed;
+
+    // Проверка соответствия значения диапазону
+    if (targetARR < MaxSpeed) targetARR = MaxSpeed;
+    if (targetARR > MinSpeed) targetARR = MinSpeed;
+
+    // Преобразуем ARR в частоту (Гц) с использованием предварительно рассчитанной частоты
+    float initialFreq = static_cast<float>(timerTickFreq) / (targetARR + 1);  // Целевая скорость (начальная для торможения)
+    float finalFreq = static_cast<float>(timerTickFreq) / (MinSpeed + 1);     // Минимальная скорость (конечная для торможения)
+
+    // Рассчитываем дистанцию торможения на основе разницы скоростей
+    // Используем формулу: s = (v_initial^2 - v_final^2) / (2 * deceleration)
+    float v_initial = initialFreq / 1000.0f;  // Нормализуем для расчета
+    float v_final = finalFreq / 1000.0f;      // Нормализуем для расчета
+    float deceleration = settings->Slowdown / 10000.0f;  // Коэффициент замедления
+
+    // Добавляем запас 20%
+    uint32_t brakingSteps = static_cast<uint32_t>(
+        (powf(v_initial, 2) - powf(v_final, 2)) / (2 * deceleration) * 1.2f
+    );
+
+    // Минимальное безопасное значение
+    if (brakingSteps < 50U) {
+        brakingSteps = 50U;
+    }
+
+    // Ограничиваем количество шагов размером буфера таблицы
+    if (brakingSteps > MAX_RAMP_STEPS) {
+        brakingSteps = MAX_RAMP_STEPS;
+        STM_LOG("Warning: Braking steps limited to %d (buffer size)", MAX_RAMP_STEPS);
+    }
+
+    // Используем %f вместо %.2f для улучшения совместимости с форматированием
+    STM_LOG("Calculated braking steps: %lu (initial freq: %f Hz, final freq: %f Hz)",
+            brakingSteps, initialFreq, finalFreq);
+
+    return brakingSteps;
+}
+
+// Реализация метода расчета таблицы разгона
+void extern_driver::calculateAccelTable(uint32_t accelSteps) {
+    // Получаем параметры разгона
+    uint32_t startARR = settings->StartSpeed;  // Большое значение ARR = низкая скорость
+    uint32_t targetARR = settings->Speed;      // Малое значение ARR = высокая скорость
+
+    // Проверка соответствия значений диапазонам
+    if (startARR < MaxSpeed) startARR = MaxSpeed;
+    if (startARR > MinSpeed) startARR = MinSpeed;
+    if (targetARR < MaxSpeed) targetARR = MaxSpeed;
+    if (targetARR > MinSpeed) targetARR = MinSpeed;
+
+    // Ограничиваем количество шагов таблицей и имеющимся диапазоном
+    uint16_t steps = static_cast<uint16_t>(accelSteps);
+    if (steps > MAX_RAMP_STEPS) steps = MAX_RAMP_STEPS;
+
+    // Для линейного изменения частоты, нам нужно нелинейно менять ARR
+    // Преобразуем ARR в частоту
+    double startFreq = 1.0 / startARR;
+    double targetFreq = 1.0 / targetARR;
+    double freqDiff = targetFreq - startFreq;
+
+    // Заполняем таблицу ускорения с линейным изменением частоты
+    for (uint16_t i = 0; i < steps; i++) {
+        // Линейно увеличиваем частоту
+        double progress = static_cast<double>(i) / steps;
+        double currentFreq = startFreq + (freqDiff * progress);
+
+        // Преобразуем частоту обратно в ARR
+        uint32_t arr = static_cast<uint32_t>(1.0 / currentFreq);
+
+        // Проверка границ значения ARR
+        if (arr < MaxSpeed) arr = MaxSpeed;
+        if (arr > MinSpeed) arr = MinSpeed;
+
+        // Сохраняем значение в таблице
+        rampTables.accelTable[i] = arr;
+    }
+
+    // Убедимся, что последнее значение точно соответствует целевому
+    if (steps > 0) {
+        rampTables.accelTable[steps - 1] = targetARR;
+    }
+
+    // Сохраняем количество шагов в таблице
+    rampTables.accelSteps = steps;
+
+    // Выводим диагностику
+    STM_LOG("Linear acceleration table: steps=%d, start=%lu, end=%lu",
+           steps, rampTables.accelTable[0], rampTables.accelTable[steps-1]);
+}
+
+// Реализация метода расчета таблицы торможения
+void extern_driver::calculateDecelTable(uint32_t brakingSteps) {
+    // Получаем параметры торможения
+    uint32_t startARR = settings->Speed;   // Начинаем с основной скорости
+    uint32_t targetARR = MinSpeed;        // Заканчиваем на минимальной скорости
+
+    // Проверка соответствия значений диапазонам
+    if (startARR < MaxSpeed) startARR = MaxSpeed;
+    if (startARR > MinSpeed) startARR = MinSpeed;
+
+    // Ограничиваем количество шагов таблицей
+    uint16_t steps = static_cast<uint16_t>(brakingSteps);
+    if (steps > MAX_RAMP_STEPS) steps = MAX_RAMP_STEPS;
+
+    // Для линейного изменения частоты, нам нужно нелинейно менять ARR
+    // Преобразуем ARR в частоту
+    double startFreq = 1.0 / startARR;
+    double targetFreq = 1.0 / targetARR;
+    double freqDiff = targetFreq - startFreq; // Будет отрицательное значение для торможения
+
+    // Заполняем таблицу торможения с линейным изменением частоты
+    for (uint16_t i = 0; i < steps; i++) {
+        // Линейно уменьшаем частоту
+        double progress = static_cast<double>(i) / steps;
+        double currentFreq = startFreq + (freqDiff * progress);
+
+        // Преобразуем частоту обратно в ARR
+        uint32_t arr = static_cast<uint32_t>(1.0 / currentFreq);
+
+        // Проверка границ значения ARR
+        if (arr < MaxSpeed) arr = MaxSpeed;
+        if (arr > MinSpeed) arr = MinSpeed;
+
+        // Сохраняем значение в таблице
+        rampTables.decelTable[i] = arr;
+    }
+
+    // Убедимся, что последнее значение точно соответствует целевому
+    if (steps > 0) {
+        rampTables.decelTable[steps - 1] = targetARR;
+    }
+
+    // Сохраняем количество шагов в таблице
+    rampTables.decelSteps = steps;
+
+    // Выводим диагностику
+    STM_LOG("Linear deceleration table: steps=%d, start=%lu, end=%lu",
+           steps, rampTables.decelTable[0], rampTables.decelTable[steps-1]);
+}
+
+// Обработчик прерывания таймера
+void extern_driver::handleTimerInterrupt() {
+
+	// Обработка разгона
+	if (Status == statusMotor::ACCEL) {
+		// Увеличиваем счетчик шагов в таблице
+		rampTables.currentStep++;
+
+		// Проверяем, достигли ли конца таблицы разгона
+		if (rampTables.currentStep >= rampTables.accelSteps) {
+			// Достигнута целевая скорость
+			//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
+			SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, settings->Speed);
+			Status = statusMotor::MOTION;
+			STM_LOG("Acceleration complete, reached target speed");
+		} else {
+			// Устанавливаем следующее значение ARR из таблицы
+			//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[rampTables.currentStep]);
+			SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[rampTables.currentStep]);
+		}
+	}
+	// Обработка торможения
+	else if (Status == statusMotor::BRAKING) {
+		// Увеличиваем счетчик шагов в таблице
+		rampTables.currentStep++;
+
+		// Проверяем, достигли ли конца таблицы торможения
+		if (rampTables.currentStep >= rampTables.decelSteps) {
+			// Достигнута минимальная скорость
+			//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, MinSpeed);
+			SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, MinSpeed);
+
+			// В зависимости от режима работы, можем остановиться или продолжить на минимальной скорости
+			switch (settings->mod_rotation) {
+				case step_inf:
+				case bldc_inf:
+					// В бесконечных режимах останавливаемся
+					stop(statusTarget_t::finished);
+					break;
+				default:
+					// В других режимах продолжаем на минимальной скорости до достижения целевой позиции
+					break;
+			}
+
+			//STM_LOG("Deceleration complete, reached minimum speed");
+		} else {
+			// Устанавливаем следующее значение ARR из таблицы
+			//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.decelTable[rampTables.currentStep]);
+			SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.decelTable[rampTables.currentStep]);
+		}
+	}
 }
 
 extern_driver::~extern_driver() {

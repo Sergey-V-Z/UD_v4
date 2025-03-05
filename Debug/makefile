@@ -99,8 +99,8 @@ all: main-build
 main-build: UD_v4.elf secondary-outputs
 
 # Tool invocations
-UD_v4.elf UD_v4.map: $(OBJS) $(USER_OBJS) D:\Radio\Jobe\Universal_Driver\Universal_Driver_soft\UD_v4\STM32F407VETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-g++ -o "UD_v4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Radio\Jobe\Universal_Driver\Universal_Driver_soft\UD_v4\STM32F407VETX_FLASH.ld" -Wl,-Map="UD_v4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+UD_v4.elf UD_v4.map: $(OBJS) $(USER_OBJS) D:\Radio\Jobe\UD_v4\STM32F407VETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-g++ -o "UD_v4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Radio\Jobe\UD_v4\STM32F407VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="UD_v4.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

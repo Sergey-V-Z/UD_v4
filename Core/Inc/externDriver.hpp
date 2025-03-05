@@ -7,6 +7,11 @@
 #define DIRECT_CCW HAL_GPIO_WritePin(CW_CCW_GPIO_Port, CW_CCW_Pin, GPIO_PIN_RESET);
 #define DIRECT_CW HAL_GPIO_WritePin(CW_CCW_GPIO_Port, CW_CCW_Pin, GPIO_PIN_SET);
 
+#define SET_TIM_ARR_AND_PULSE(htim, channel, arr_value) do { \
+    __HAL_TIM_SET_AUTORELOAD((htim), (arr_value)); \
+    __HAL_TIM_SET_COMPARE((htim), (channel), (arr_value) / 2); \
+} while(0)
+
 // Новый enum для состояния драйвера
 typedef enum {
     DRIVER_OK = 0,
@@ -126,6 +131,7 @@ public:
     void AccelHandler();
     void StartDebounceTimer(uint16_t GPIO_Pin);
     void HandleDebounceTimeout();
+    void handleTimerInterrupt();
 
 private:
     //void updateCurrentSteps(int32_t steps);
@@ -142,6 +148,8 @@ private:
     uint32_t calculateBrakingDistance(uint32_t currentSpeed);
     double calculateAccelStep(double progress);
 
+    void calculateTimerFrequency();// Метод для расчета частоты тактирования таймера
+
     uint16_t map_PercentFromARR(uint16_t arr_value);
     uint16_t map_ARRFromPercent(uint16_t percent_value);
     /**
@@ -155,6 +163,12 @@ private:
      * Запускает таймер при отсутствии движения
      */
     void checkEncoderMotion();
+
+    // Методы для работы с таблицами разгона и торможения
+    void calculateAccelTable(uint32_t accelSteps);   // Расчет таблицы разгона
+    void calculateDecelTable(uint32_t brakingSteps);   // Расчет таблицы торможения
+    uint32_t calculateBrakingSteps();  // Расчет количества шагов для торможения
+    uint32_t calculateAccelSteps();
 
     // Параметры драйвера
     driver_status_t currentDriverStatus;
@@ -194,7 +208,7 @@ private:
     fb FeedbackType = fb::NON;
 
     // Параметры позиционирования
-    const uint32_t START_VIBRATION_TIMEOUT = 1000;
+    const uint32_t START_VIBRATION_TIMEOUT = 30;
     bool ignore_sensors = false;
     uint32_t vibration_start_time = 0;
     pos_t position = pos_t::D_0_1;
@@ -205,4 +219,18 @@ private:
     bool change_pos = false;
     uint32_t time = 0;
     uint8_t bos_bit = 0;
+    uint32_t timerTickFreq;  // Частота тактирования таймера с учетом предделителя
+
+    // Максимальное количество шагов в таблице разгона/торможения
+    static const uint16_t MAX_RAMP_STEPS = 200;
+
+    // Структура для таблиц разгона и торможения
+    struct {
+        uint32_t accelTable[MAX_RAMP_STEPS];  // Таблица значений ARR для разгона
+        uint32_t decelTable[MAX_RAMP_STEPS];  // Таблица значений ARR для торможения
+        uint16_t accelSteps;                  // Количество шагов в таблице разгона
+        uint16_t decelSteps;                  // Количество шагов в таблице торможения
+        uint16_t currentStep;                 // Текущий шаг в таблице (для разгона или торможения)
+    } rampTables;
+
 };
