@@ -29,7 +29,8 @@ typedef enum {
     finished,
     errMotion,
     errDirection,
-    errDriver  // Добавляем новое состояние ошибки для драйвера
+    errDriver,  // Добавляем новое состояние ошибки для драйвера
+	errLimitSwitch
 } statusTarget_t;
 
 typedef enum {
@@ -107,6 +108,7 @@ public:
     //void goTo(int steps, dir direct);
     void Init();
     bool Calibration_pool();
+    bool limit_switch_pool();
     //void findHome();
     void CallStart();
     //void findHomeStart();
@@ -185,7 +187,9 @@ private:
     TIM_HandleTypeDef* debounceTimer;
     TIM_HandleTypeDef *TimEncoder;
 
-    const uint32_t DEBOUNCE_TIMEOUT = 100;
+    const uint32_t DEBOUNCE_TIMEOUT = 50;
+    bool ignore_sensors = false;
+    bool is_start_ignore_timer = false;
     volatile bool d0_debounce_active = false;
     volatile bool d1_debounce_active = false;
 
@@ -209,7 +213,6 @@ private:
 
     // Параметры позиционирования
     const uint32_t START_VIBRATION_TIMEOUT = 30;
-    bool ignore_sensors = false;
     uint32_t vibration_start_time = 0;
     pos_t position = pos_t::D_0_1;
     pos_t target = pos_t::D_0_1;

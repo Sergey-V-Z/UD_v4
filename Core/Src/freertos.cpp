@@ -316,8 +316,9 @@ void motor_pool(void const * argument)
 	//uint32_t tickcount = osKernelSysTick();// переменная для точной задержки
 	/* Infinite loop */
 	for (;;) {
-		//osDelay(1);
-		//pMotor->AccelHandler();
+
+		// проверять концевики. если мотор не стоит и концевик включен то экстренно остановить
+		pMotor->limit_switch_pool();
 
 		//osDelayUntil(&tickcount, 1); // задача будет вызываься ровно через 1 милисекунду
 		osDelay(1);
@@ -380,7 +381,7 @@ void CallTask(void const * argument)
             STM_LOG("Calibration completed successfully");
 		}
 		//pMotor->findHome();
-		osDelay(1);
+		osDelay(10);
 	}
   /* USER CODE END CallTask */
 }

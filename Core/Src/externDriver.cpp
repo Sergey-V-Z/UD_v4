@@ -149,7 +149,7 @@ void extern_driver::Init() {
     HAL_TIM_OC_Start_IT(TimCountAllSteps, TIM_CHANNEL_1);
     HAL_TIM_OC_Start_IT(TimCountAllSteps, TIM_CHANNEL_2);
 
-    HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_SET); // Выключение драйвера
 
     checkDriverStatus();
     Parameter_update();
@@ -192,6 +192,11 @@ bool extern_driver::start(uint32_t steps, dir d) {
 
 	dir temp_diretion = settings->Direct;
     if (Status == statusMotor::STOPPED) {
+
+        // Проверяем текущее состояние датчиков
+        bool on_D0 = HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET;
+        bool on_D1 = HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin) == GPIO_PIN_SET;
+
         // Проверяем состояние драйвера перед стартом
         checkDriverStatus();
         if (currentDriverStatus != DRIVER_OK) {
@@ -214,11 +219,11 @@ bool extern_driver::start(uint32_t steps, dir d) {
     		case calibration_enc:
     		{
 
-    			if (temp_diretion == dir::CW && HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin)) {
+    			if (temp_diretion == dir::CW && on_D0) {
     				STM_LOG("Cannot move CW: at CW limit switch");
     				return false;
     			}
-    			else if (temp_diretion == dir::CCW && HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin)) {
+    			else if (temp_diretion == dir::CCW && on_D1) {
     				STM_LOG("Cannot move CCW: at CCW limit switch");
     				return false;
     			}
@@ -248,11 +253,11 @@ bool extern_driver::start(uint32_t steps, dir d) {
     		{
     			// добавить отключение таймеров обратной связи
 
-    			if (temp_diretion == dir::CW && HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin)) {
+    			if (temp_diretion == dir::CW && on_D0) {
     				STM_LOG("Cannot move CW: at CW limit switch");
     				return false;
     			}
-    			else if (temp_diretion == dir::CCW && HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin)) {
+    			else if (temp_diretion == dir::CCW && on_D1) {
     				STM_LOG("Cannot move CCW: at CCW limit switch");
     				return false;
     			}
@@ -268,9 +273,6 @@ bool extern_driver::start(uint32_t steps, dir d) {
     			break;
     		}
         }
-
-        ignore_sensors = true;
-        vibration_start_time = HAL_GetTick();
 
         PrevCounterENC = TimEncoder->Instance->CNT;
         countErrDir = 3;
@@ -347,6 +349,13 @@ bool extern_driver::start(uint32_t steps, dir d) {
         //STM_LOG("Speed start: %d", (int)(TimFrequencies->Instance->ARR));
         STM_LOG("Start motor.");
 
+     	// запускать антидребезга только если мы на концевике
+     	if(on_D0)
+     		StartDebounceTimer(D0_Pin);
+     	else if (on_D1)
+     		StartDebounceTimer(D1_Pin);
+
+        HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_RESET); // Включение драйвера
         HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
@@ -363,6 +372,10 @@ bool extern_driver::startForCall(dir d) {
     		((settings->mod_rotation == mode_rotation_t::calibration_enc) && (settings->mod_rotation == mode_rotation_t::calibration_timer)))
     {
 
+        // Проверяем текущее состояние датчиков
+        bool on_D0 = HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET;
+        bool on_D1 = HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin) == GPIO_PIN_SET;
+
         // Сбрасываем счетчик шагов таблицы
         rampTables.currentStep = 0;
 
@@ -376,27 +389,24 @@ bool extern_driver::startForCall(dir d) {
             return false;
         }
 
-		if (settings->Direct == dir::CW && HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin)) {
+		if (settings->Direct == dir::CW && on_D0) {
 			STM_LOG("Cannot move CW: at CW limit switch");
 			return false;
 		}
-		else if (settings->Direct == dir::CCW && HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin)) {
+		else if (settings->Direct == dir::CCW && on_D1) {
 			STM_LOG("Cannot move CCW: at CCW limit switch");
 			return false;
 		} else {
 
 		}
 
-        ignore_sensors = true;
-        vibration_start_time = HAL_GetTick();
-        StatusTarget = statusTarget_t::inProgress;
-
-
 		if (settings->Direct == dir::CCW) {
 			DIRECT_CCW
 		} else {
 			DIRECT_CW
 		}
+
+        StatusTarget = statusTarget_t::inProgress;
 
         // Рассчитываем количество шагов, необходимых для торможения
         uint32_t brakingSteps = calculateBrakingSteps();
@@ -423,6 +433,15 @@ bool extern_driver::startForCall(dir d) {
 		}
 
         Status = statusMotor::ACCEL;
+        ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_UP); //режим счета
+
+     	// запускать антидребезга только если мы на концевике
+     	if(on_D0)
+     		StartDebounceTimer(D0_Pin);
+     	else if (on_D1)
+     		StartDebounceTimer(D1_Pin);
+
+        HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_RESET); // Включение драйвера
         HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
@@ -436,6 +455,7 @@ void extern_driver::stop(statusTarget_t status) {
     ignore_sensors = false;
 
     HAL_TIM_OC_Stop_IT(TimFrequencies, ChannelClock);
+    HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_SET); // Выключение драйвера
     //permission_calibrate = false;
     //permission_findHome = false;
 
@@ -527,7 +547,8 @@ void extern_driver::removeBreak(bool status) {
 void extern_driver::SensHandler(uint16_t GPIO_Pin) {
 
     // Если включено игнорирование датчиков, проверяем не истек ли таймаут
-    if (ignore_sensors) {
+    /*
+	if (ignore_sensors) {
         if ((HAL_GetTick() - vibration_start_time) < START_VIBRATION_TIMEOUT) {
             // Игнорируем прерывание
             return;
@@ -536,7 +557,9 @@ void extern_driver::SensHandler(uint16_t GPIO_Pin) {
             ignore_sensors = false;
             position = pos_t::D_0_1;
         }
-    }
+    }*/
+
+	if (ignore_sensors) return;
 
     stop(statusTarget_t::finished);
 
@@ -603,237 +626,6 @@ void extern_driver::SensHandler(uint16_t GPIO_Pin) {
 	}
 
 }
-
-/**
- * Обработчик разгона и торможения двигателя.
- * Управляет ускорением, замедлением и проверяет корректность движения в зависимости от режима работы.
- */
-/*void extern_driver::AccelHandler() {
-    static uint32_t accel_step = 0;
-    static uint32_t lastSpeedUpdate = 0;
-    uint32_t currentTime = HAL_GetTick();
-
-    switch (Status) {
-        case statusMotor::ACCEL: {
-            if (currentTime - lastSpeedUpdate >= 10) {  // Update every 10ms
-                lastSpeedUpdate = currentTime;
-
-                if (permission_calibrate) {
-                    // Use exponential acceleration to Speed_Call
-                    double progress = static_cast<double>(accel_step) / ACCEL_STEPS;
-                    uint32_t newSpeed = static_cast<uint32_t>(calculateAccelStep(progress));
-
-                    if (newSpeed >= settings->Speed) {
-                        TimFrequencies->Instance->ARR = newSpeed;
-                        accel_step++;
-                    } else {
-                        TimFrequencies->Instance->ARR = settings->Speed;
-                        Status = statusMotor::MOTION;
-                        accel_step = 0;
-                    }
-                } else {
-                    // Normal operation - accelerate to settings->Speed
-                    double progress = static_cast<double>(accel_step) / ACCEL_STEPS;
-                    uint32_t newSpeed = static_cast<uint32_t>(calculateAccelStep(progress));
-
-                    if (newSpeed >= settings->Speed) {
-                        TimFrequencies->Instance->ARR = newSpeed;
-                        accel_step++;
-                    } else {
-                        TimFrequencies->Instance->ARR = settings->Speed;
-                        Status = statusMotor::MOTION;
-                        accel_step = 0;
-
-                        // Calculate and update braking distance
-                        uint32_t requiredBrakingDistance = calculateBrakingDistance(settings->Speed);
-                        settings->SlowdownDistance = requiredBrakingDistance;
-                    }
-                }
-            }
-            break;
-        }
-
-        case statusMotor::BRAKING: {
-            // Линейное торможение с автоматическим расчётом параметров
-            // Для периодов: значение ARR должно увеличиваться для замедления
-            uint32_t current_period = TimFrequencies->Instance->ARR;
-            uint32_t next_period = current_period + settings->Slowdown;
-
-            if (next_period <= MinSpeed) {
-                // Постепенно увеличиваем период (замедляем)
-                TimFrequencies->Instance->ARR = next_period;
-            } else {
-                // Достигли минимальной скорости
-                TimFrequencies->Instance->ARR = MinSpeed;
-
-                // Проверяем режим работы для дополнительных действий
-                switch (settings->mod_rotation) {
-                    case mode_rotation_t::step_inf:
-                    case mode_rotation_t::bldc_inf:
-                        // Для бесконечных режимов полная остановка
-                        stop(statusTarget_t::finished);
-                        break;
-
-                    default:
-                        // Для режимов с позиционированием продолжаем на минимальной скорости
-                        // до достижения целевой позиции
-                        TimFrequencies->Instance->ARR = MinSpeed;
-                        break;
-                }
-            }
-            break;
-        }
-
-        default:
-            break;
-    }
-
-    // Motion checks based on mode
-    switch (settings->mod_rotation) {
-        case mode_rotation_t::step_by_meter_enc_intermediate:
-        case mode_rotation_t::step_by_meter_enc_limit:
-            // Check encoder feedback
-            if ((Status == statusMotor::MOTION) || (Status == statusMotor::BRAKING)) {
-                checkEncoderMotion();
-            }
-            // Fallthrough intentional
-
-        case mode_rotation_t::step_by_meter_timer_intermediate:
-        case mode_rotation_t::step_by_meter_timer_limit:
-            // Handle timeout
-            if (TimerIsStart) {
-                Time++;
-                if (Time >= settings->TimeOut) {
-                    TimerIsStart = false;
-                    Time = 0;
-                    stop(statusTarget_t::errMotion);
-                }
-            }
-            break;
-
-        default:
-            break;
-    }
-}*/
-
-/**
- * @brief Обработчик ускорения с улучшенным профилем для быстрого старта
- */
-//#define MAX_STEPS settings->Accel
-//#define MAX_STEPS_SLOW settings->
-
-void extern_driver::AccelHandler() {
-    static uint16_t step_counter = 0;
-    //const uint16_t MAX_STEPS = 500; // Уменьшаем общее число шагов для более быстрого разгона
-
-    switch (Status) {
-        case statusMotor::ACCEL: {
-            uint16_t start_arr = MinSpeed; // Начальное значение ARR
-            uint16_t target_arr = settings->Speed;
-
-            if (step_counter < settings->Accel) {
-                // Процент прохождения пути (от 0.0 до 1.0)
-                float progress = (float)step_counter / settings->Accel;
-
-                // Используем кубический корень для более быстрого начального ускорения
-                // и более плавного завершения
-                float factor = 1.0f - powf(progress, 0.33f);
-
-                // Вычисляем новое значение ARR
-                uint16_t new_arr = target_arr + (uint16_t)((start_arr - target_arr) * factor);
-
-                // Защита от выхода за границы диапазона
-                if (new_arr < target_arr) new_arr = target_arr;
-                if (new_arr > start_arr) new_arr = start_arr;
-
-                // Устанавливаем новое значение
-                TimFrequencies->Instance->ARR = new_arr;
-
-                // Увеличиваем счетчик шагов
-                step_counter++;
-            } else {
-                // Достигли целевой скорости
-                TimFrequencies->Instance->ARR = target_arr;
-                Status = statusMotor::MOTION;
-                step_counter = 0; // Сбрасываем счетчик для следующего использования
-            }
-            break;
-        }
-
-        case statusMotor::BRAKING: {
-            uint16_t start_arr = TimFrequencies->Instance->ARR; // Текущее значение ARR
-            uint16_t target_arr = MinSpeed; // Целевое значение ARR (минимальная скорость)
-
-            if (step_counter < settings->Slowdown) {
-                // Процент прохождения пути (от 0.0 до 1.0)
-                float progress = (float)step_counter / settings->Slowdown;
-
-                // Используем кубическую функцию для более быстрого начального замедления
-                float factor = powf(progress, 3.0f);
-
-                // Вычисляем новое значение ARR
-                uint16_t new_arr = start_arr + (uint16_t)((target_arr - start_arr) * factor);
-
-                // Защита от выхода за границы диапазона
-                if (new_arr < start_arr) new_arr = start_arr;
-                if (new_arr > target_arr) new_arr = target_arr;
-
-                // Устанавливаем новое значение
-                TimFrequencies->Instance->ARR = new_arr;
-
-                // Увеличиваем счетчик шагов
-                step_counter++;
-            } else {
-                // Достигли минимальной скорости
-                TimFrequencies->Instance->ARR = target_arr;
-                step_counter = 0; // Сбрасываем счетчик
-            }
-            break;
-        }
-
-        default:
-            break;
-    }
-}
-
-/*void extern_driver::AccelHandler() {
-    switch (Status) {
-        case statusMotor::ACCEL: {
-            if (permission_calibrate) {
-                // Режим калибровки - разгон до специальной скорости Speed_Call
-                if (((TimFrequencies->Instance->ARR) - settings->Accel) >= settings->Speed) {
-                    (TimFrequencies->Instance->ARR) -= settings->Accel;  // Плавное увеличение скорости
-                } else {
-                    (TimFrequencies->Instance->ARR) = settings->Speed;   // Достигнута целевая скорость
-                    Status = statusMotor::MOTION;                        // Переход в режим движения
-                }
-            } else {
-                // Обычный режим работы - разгон до настроенной скорости settings->Speed
-                if (((TimFrequencies->Instance->ARR) - settings->Accel) >= settings->Speed) {
-                    (TimFrequencies->Instance->ARR) -= settings->Accel;  // Плавное увеличение скорости
-                } else {
-                    (TimFrequencies->Instance->ARR) = settings->Speed;   // Достигнута целевая скорость
-                    Status = statusMotor::MOTION;                        // Переход в режим движения
-                }
-            }
-            break;
-        }
-
-        case statusMotor::BRAKING: {
-            // Обработка торможения - плавное уменьшение скорости
-            if ((TimFrequencies->Instance->ARR) + settings->Slowdown <= MinSpeed) {
-                (TimFrequencies->Instance->ARR) += settings->Slowdown;   // Плавное уменьшение скорости
-            } else {
-            	(TimFrequencies->Instance->ARR) = MinSpeed;
-            }
-            break;
-        }
-
-        default:
-            break;
-    }
-
-}*/
 
 /**
  * Проверка правильности направления движения по энкодеру
@@ -945,6 +737,7 @@ bool extern_driver::Calibration_pool() {
                             {
                             	__HAL_TIM_SET_COUNTER(TimEncoder,0);
                             }
+                            osDelay(10); // без этой задержки иногда зпвисает дойдя до 1 концевика
                             startForCall(dir::CW);
 
                             for(;;) {
@@ -1039,6 +832,32 @@ bool extern_driver::Calibration_pool() {
     }
     settings->mod_rotation = temp_mode;
     return ret;
+}
+
+
+bool extern_driver::limit_switch_pool() {
+	if(Status != statusMotor::STOPPED)
+	{
+	    // Проверяем текущее состояние датчиков
+		bool on_D0 = HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET;
+		bool on_D1 = HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin) == GPIO_PIN_SET;
+
+		if((ignore_sensors == false) && (on_D0) && (on_D1))
+		{
+			if(on_D0)
+			{
+				STM_LOG("emergency stop on limit switch:0" );
+			}
+			else if (on_D1)
+			{
+				STM_LOG("emergency stop on limit switch:1" );
+			}
+
+			stop(statusTarget_t::errLimitSwitch);
+		}
+	}
+
+	return true;
 }
 
 void extern_driver::CallStart() {
@@ -1255,32 +1074,84 @@ void extern_driver::StartDebounceTimer(uint16_t GPIO_Pin) {
 	// если мы находимся между концевиками то нужно остановить иначе запустить антидребезг
 
 	//if((position == pos_t::D_0_1) && (ignore_sensors == false))
-	if((position == pos_t::D_0_1) && (ignore_sensors == false))
+	/*if(ignore_sensors == false) // если таймер не запущен то просто обработка концевика
 	{
 		SensHandler(GPIO_Pin);
 	}
-	else
+	else // иначе запускаем таймер
 	{
+		// если таймер уже запущен то выходим
+		if(is_start_ignore_timer) return;
+
 	    if(GPIO_Pin == D0_Pin && !d0_debounce_active) {
 			d0_debounce_active = true;
-			// Настраиваем и запускаем таймер
-			__HAL_TIM_SET_COUNTER(debounceTimer, 0);
-			HAL_TIM_Base_Start_IT(debounceTimer);
 		}
 		else if(GPIO_Pin == D1_Pin && !d1_debounce_active) {
 			d1_debounce_active = true;
-			// Настраиваем и запускаем таймер
-			__HAL_TIM_SET_COUNTER(debounceTimer, 0);
-			HAL_TIM_Base_Start_IT(debounceTimer);
 		}
+
+		// Настраиваем и запускаем таймер
+		__HAL_TIM_SET_COUNTER(debounceTimer, 0);
+		__HAL_TIM_SET_AUTORELOAD(debounceTimer, DEBOUNCE_TIMEOUT);// настроить период
+		HAL_TIM_Base_Start_IT(debounceTimer);
+		is_start_ignore_timer = true;
+	}*/
+
+	ignore_sensors = true;
+	vibration_start_time = HAL_GetTick();
+
+	// если таймер уже запущен то выходим
+	if(is_start_ignore_timer) return;
+
+    if(GPIO_Pin == D0_Pin && !d0_debounce_active) {
+		d0_debounce_active = true;
 	}
+	else if(GPIO_Pin == D1_Pin && !d1_debounce_active) {
+		d1_debounce_active = true;
+	}
+
+	// Настраиваем и запускаем таймер
+	__HAL_TIM_SET_COUNTER(debounceTimer, 0);
+	__HAL_TIM_SET_AUTORELOAD(debounceTimer, (DEBOUNCE_TIMEOUT*1000)-1);// настроить период
+	HAL_TIM_Base_Start_IT(debounceTimer);
+	is_start_ignore_timer = true;
 
 }
 
+// обработчик таймера антидребезга
 void extern_driver::HandleDebounceTimeout() {
     // Останавливаем таймер
     HAL_TIM_Base_Stop_IT(debounceTimer);
+    is_start_ignore_timer = false;
 
+    // проверяем положение по концевикам, если мы между ними то все ок и можно выключить игнарироваине
+    ignore_sensors = false;
+    // Проверяем текущее состояние датчиков
+    bool on_D0 = HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET;
+    bool on_D1 = HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin) == GPIO_PIN_SET;
+
+    if(on_D0)
+	{
+    	// возможно это ошибка и стоит ее обработать
+    	// если таймер сработал до того как мы ушли с концевика либо мотор двигается слишком медленно либо стоит
+    	// выставить статут этой ошибки
+    	d0_debounce_active = false;
+	}
+    else if (on_D1)
+    {
+    	// возможно это ошибка и стоит ее обработать
+    	// если таймер сработал до того как мы ушли с концевика либо мотор двигается слишком медленно либо стоит
+    	// выставить статут этой ошибки
+    	d1_debounce_active = false;
+    }
+    else
+    {
+    	d0_debounce_active = false;
+    	d1_debounce_active = false;
+    	position = pos_t::D_0_1;
+    	// все ок
+    }
+    /*
     // Проверяем D0
     if(d0_debounce_active) {
         if(HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET) {
@@ -1298,6 +1169,7 @@ void extern_driver::HandleDebounceTimeout() {
         }
         d1_debounce_active = false;
     }
+    */
 }
 
 bool extern_driver::validatePointNumber(uint32_t point_number) {
@@ -1371,6 +1243,9 @@ bool extern_driver::gotoPoint(uint32_t point_number) {
 bool extern_driver::gotoLSwitch(uint8_t sw_x) {
 	if (settings->points.is_calibrated) {
 
+        bool on_D0 = HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET;
+        bool on_D1 = HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin) == GPIO_PIN_SET;
+
 		dir temp_diretion = dir::CW;
 
 		if (sw_x == 0) {
@@ -1388,11 +1263,11 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
             return false;
         }
 
-		if (temp_diretion == dir::CW && HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin)) {
+		if (temp_diretion == dir::CW && on_D0) {
 			STM_LOG("Cannot move CW: at CW limit switch");
 			return false;
 		}
-		else if (temp_diretion == dir::CCW && HAL_GPIO_ReadPin(D1_GPIO_Port, D1_Pin)) {
+		else if (temp_diretion == dir::CCW && on_D1) {
 			STM_LOG("Cannot move CCW: at CCW limit switch");
 			return false;
 		} else {
@@ -1402,8 +1277,6 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         // Сбрасываем счетчик шагов таблицы
         rampTables.currentStep = 0;
 
-        ignore_sensors = true;
-        vibration_start_time = HAL_GetTick();
         StatusTarget = statusTarget_t::inProgress;
 
 
@@ -1458,7 +1331,7 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         	case bldc_inf:
         	{
         		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->Speed);
-        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, settings->StartSpeed);
+        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, settings->Speed);
         		Status = statusMotor::MOTION;
         		break;
         	}
@@ -1468,6 +1341,13 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         	}
         }
 
+     	// запускать антидребезга только если мы на концевике
+     	if(on_D0)
+     		StartDebounceTimer(D0_Pin);
+     	else if (on_D1)
+     		StartDebounceTimer(D1_Pin);
+
+        HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_RESET); // Включение драйвера
         HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
         return true;
@@ -1691,8 +1571,7 @@ void extern_driver::calculateTimerFrequency() {
     uint32_t prescaler = TimFrequencies->Instance->PSC + 1;
     timerTickFreq = timerClockFreq / prescaler;
 
-    STM_LOG("Timer frequency calculated: %lu Hz (Clock: %lu Hz, Prescaler: %lu)",
-            timerTickFreq, timerClockFreq, prescaler);
+    //STM_LOG("Timer frequency calculated: %lu Hz (Clock: %lu Hz, Prescaler: %lu)", timerTickFreq, timerClockFreq, prescaler);
 }
 
 // Расчет количества шагов для ускорения
@@ -1733,8 +1612,7 @@ uint32_t extern_driver::calculateAccelSteps() {
         STM_LOG("Warning: Acceleration steps limited to %d (buffer size)", MAX_RAMP_STEPS);
     }
 
-    STM_LOG("Calculated acceleration steps: %lu (initial freq: %f Hz, final freq: %f Hz)",
-            accelSteps, initialFreq, finalFreq);
+    //STM_LOG("Calculated acceleration steps: %lu (initial freq: %f Hz, final freq: %f Hz)", accelSteps, initialFreq, finalFreq);
 
     return accelSteps;
 }
@@ -1775,8 +1653,7 @@ uint32_t extern_driver::calculateBrakingSteps() {
     }
 
     // Используем %f вместо %.2f для улучшения совместимости с форматированием
-    STM_LOG("Calculated braking steps: %lu (initial freq: %f Hz, final freq: %f Hz)",
-            brakingSteps, initialFreq, finalFreq);
+    //STM_LOG("Calculated braking steps: %lu (initial freq: %f Hz, final freq: %f Hz)", brakingSteps, initialFreq, finalFreq);
 
     return brakingSteps;
 }
@@ -1829,8 +1706,7 @@ void extern_driver::calculateAccelTable(uint32_t accelSteps) {
     rampTables.accelSteps = steps;
 
     // Выводим диагностику
-    STM_LOG("Linear acceleration table: steps=%d, start=%lu, end=%lu",
-           steps, rampTables.accelTable[0], rampTables.accelTable[steps-1]);
+    //STM_LOG("Linear acceleration table: steps=%d, start=%lu, end=%lu", steps, rampTables.accelTable[0], rampTables.accelTable[steps-1]);
 }
 
 // Реализация метода расчета таблицы торможения
@@ -1879,11 +1755,15 @@ void extern_driver::calculateDecelTable(uint32_t brakingSteps) {
     rampTables.decelSteps = steps;
 
     // Выводим диагностику
-    STM_LOG("Linear deceleration table: steps=%d, start=%lu, end=%lu",
-           steps, rampTables.decelTable[0], rampTables.decelTable[steps-1]);
+    //STM_LOG("Linear deceleration table: steps=%d, start=%lu, end=%lu", steps, rampTables.decelTable[0], rampTables.decelTable[steps-1]);
 }
 
-// Обработчик прерывания таймера
+/**
+ * Обработчик разгона и торможения двигателя.
+ * Управляет ускорением, замедлением и проверяет корректность движения в зависимости от режима работы.
+ *
+ * Обработчик прерывания таймера Разгон и торможение
+ */
 void extern_driver::handleTimerInterrupt() {
 
 	// Обработка разгона
