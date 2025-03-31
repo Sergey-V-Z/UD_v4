@@ -213,30 +213,29 @@ bool extern_driver::start(uint32_t steps, dir d) {
      	}
         // проверка по концевикам выставление направления
      	switch (settings->mod_rotation) {
-    		case step_by_meter_enc_intermediate:
-    		case step_by_meter_timer_intermediate:
-    		case calibration_timer:
-    		case calibration_enc:
-    		{
+			case step_by_meter_enc_intermediate:
+			case step_by_meter_timer_intermediate:
+			case calibration_timer:
+			case calibration_enc:
+			{
+				if (temp_diretion == dir::CW && on_D0) {
+					STM_LOG("Cannot move CW: at CW limit switch");
+					return false;
+				}
+				else if (temp_diretion == dir::CCW && on_D1) {
+					STM_LOG("Cannot move CCW: at CCW limit switch");
+					return false;
+				}
 
-    			if (temp_diretion == dir::CW && on_D0) {
-    				STM_LOG("Cannot move CW: at CW limit switch");
-    				return false;
-    			}
-    			else if (temp_diretion == dir::CCW && on_D1) {
-    				STM_LOG("Cannot move CCW: at CCW limit switch");
-    				return false;
-    			}
-
-    			if (temp_diretion == dir::CCW) {
-    				DIRECT_CCW
-    				ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_UP); //от  0 датчика к 1 CCW
-    			} else {
-    				DIRECT_CW
-    				ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_DOWN); //от  1 датчика к 0 CW
-    			}
-    			break;
-    		}
+				if (temp_diretion == dir::CCW) {
+					DIRECT_CCW
+					ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_UP); // от 0 датчика к 1 CCW
+				} else {
+					DIRECT_CW
+					ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_DOWN); // от 1 датчика к 0 CW
+				}
+				break;
+			}
     		case step_inf:
     		case bldc_inf:
     		{
@@ -295,27 +294,19 @@ bool extern_driver::start(uint32_t steps, dir d) {
         switch (settings->mod_rotation) {
         	case calibration_enc:
         	case step_by_meter_enc_intermediate:
-        	//case step_by_meter_enc_limit:
         	{
-        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[0]);
-        		//__HAL_TIM_SET_COMPARE(TimFrequencies, ChannelClock, rampTables.accelTable[0] / 2);
-        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
+                // Установка начальной скорости
+                SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
-        		// обработать направление. если двигаться в CCW 0->1 то все ок но если двигаться CW 1->0 то шаги для торможения нужно прибавить
-				__HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
-        		if(settings->Direct == dir::CCW){
-        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps - brakingSteps);
-        		} else {
-        			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, steps + brakingSteps);
-        		}
-				__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, steps);
-        		Status = statusMotor::ACCEL;
-        		break;
+                // Используем новую настройку энкодера
+                setupEncoderMovement(steps, temp_diretion);
+
+                Status = statusMotor::ACCEL;
+                break;
         	}
         	case step_inf:
         	case calibration_timer:
         	case step_by_meter_timer_intermediate:
-        	//case step_by_meter_timer_limit:
         	{
         		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, rampTables.accelTable[0]);
         		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
@@ -425,12 +416,27 @@ bool extern_driver::startForCall(dir d) {
 			__HAL_TIM_SET_AUTORELOAD(TimCountAllSteps, 0xffff);
 			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_1, 0xffff);
 			__HAL_TIM_SET_COMPARE(TimCountAllSteps, TIM_CHANNEL_2, 0xffff);
-		} else {
-			__HAL_TIM_SET_COUNTER(TimEncoder, 0);
-			__HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
-			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0xffff);
-			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0xffff);
 		}
+		else if(settings->mod_rotation == mode_rotation_t::calibration_enc)
+        {
+            // Для энкодера используем новый механизм
+            __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+            __HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
+
+            // Отключаем каналы сравнения для бесконечного движения
+            // Устанавливаем их в максимально удаленные значения
+            if(settings->Direct == dir::CCW) {
+                __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0xFFFF);
+                __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0xFFFF);
+            } else {
+                __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0);
+                __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0);
+            }
+
+            // Включаем обработку событий
+            HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_3);
+            HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_4);
+        }
 
         Status = statusMotor::ACCEL;
         ChangeTimerMode(TimCountAllSteps, TIM_COUNTERMODE_UP); //режим счета
@@ -579,10 +585,17 @@ void extern_driver::SensHandler(uint16_t GPIO_Pin) {
         	case step_inf:
         	case bldc_inf:
         	{
-        		if(settings->points.is_calibrated){
-					updateCurrentPosition(0); //
-					settings->points.current_point = 0;
-        		}
+                if(settings->points.is_calibrated) {
+                    // Обновляем позицию и глобальную переменную
+                    if (settings->mod_rotation == step_by_meter_enc_intermediate) {
+                        // Для энкодера сбрасываем на среднее значение и обнуляем глобальную позицию
+                        __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                        globalPosition = 0;
+                    } else {
+                        updateCurrentPosition(0);
+                    }
+                    settings->points.current_point = 0;
+                }
 
         		break;
         	}
@@ -603,16 +616,48 @@ void extern_driver::SensHandler(uint16_t GPIO_Pin) {
         		break;
         	}
         	case step_by_meter_enc_intermediate:
+        	{
+                if(settings->points.is_calibrated) {
+                    // Обновляем позицию и глобальную переменную
+                    uint16_t currentCount = __HAL_TIM_GET_COUNTER(TimEncoder);
+
+                    // Если счетчик близок к краям диапазона, обновляем глобальную позицию и сбрасываем счетчик
+                    if (currentCount < 0x1000 || currentCount > 0xF000) {
+                        if (settings->Direct == dir::CCW) {
+                            // Движение CCW (увеличение счетчика)
+                            int32_t increment = currentCount - ENCODER_MID_VALUE;
+                            globalPosition += increment;
+                        } else {
+                            // Движение CW (уменьшение счетчика)
+                            int32_t decrement = ENCODER_MID_VALUE - currentCount;
+                            globalPosition -= decrement;
+                        }
+
+                        // Сброс счетчика на середину
+                        __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+
+                        //STM_LOG("globalPosition: %d", globalPosition);
+                    }
+                    if (settings->mod_rotation == step_by_meter_enc_intermediate) {
+                        // Для энкодера сбрасываем на среднее значение и устанавливаем максимальное значение
+                        __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                        //globalPosition = CallSteps;
+                    } else {
+                        //updateCurrentPosition(CallSteps);
+                    }
+                    settings->points.current_point = 9;
+                }
+        		break;
+        	}
         	case step_by_meter_timer_intermediate:
+        	{
+        		settings->points.current_point = 9;
+        		break;
+        	}
         	case bldc_limit:
         	case step_inf:
         	case bldc_inf:
         	{
-        		if(settings->points.is_calibrated){
-					//updateCurrentPosition(CallSteps); //
-					settings->points.current_point = 9;
-        		}
-
         		break;
         	}
         	default:
@@ -693,6 +738,7 @@ bool extern_driver::Calibration_pool() {
 
         settings->points.is_calibrated = false;
 
+        // Устанавливаем временный режим калибровки
         switch (settings->mod_rotation) {
 
         	case step_by_meter_timer_intermediate:
@@ -717,11 +763,19 @@ bool extern_driver::Calibration_pool() {
         		break;
         	}
         }
+
+        // Устанавливаем начальные значения для глобальной позиции
+        globalPosition = 0;
+
         //STM_LOG("Starting calibration. D0: %d, D1: %d", on_D0, on_D1);
 
         if(on_D0) {
             // Если мы на D0, движемся к D1
             STM_LOG("On D0 sensor, moving to D1");
+
+            // Инициализируем счетчик энкодера для правильного отслеживания
+            __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+
             startForCall(dir::CCW);
 
             for(;;) {
@@ -735,9 +789,11 @@ bool extern_driver::Calibration_pool() {
                             }
                             else
                             {
-                            	__HAL_TIM_SET_COUNTER(TimEncoder,0);
+                                // При использовании энкодера сбрасываем счетчик в среднее значение
+                                __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                                globalPosition = 0; // Сбрасываем для измерения полного расстояния
                             }
-                            osDelay(10); // без этой задержки иногда зпвисает дойдя до 1 концевика
+                            osDelay(10); // без этой задержки иногда зависает дойдя до 1 концевика
                             startForCall(dir::CW);
 
                             for(;;) {
@@ -746,11 +802,18 @@ bool extern_driver::Calibration_pool() {
                                         if(HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET) {
                                         	CallSteps = getCurrentSteps();
                                             if(settings->mod_rotation ==  mode_rotation_t::calibration_timer){
+                                            	CallSteps = getCurrentSteps();
                                             	__HAL_TIM_SET_COUNTER(TimCountAllSteps,0);
                                             }
                                             else
                                             {
-                                            	__HAL_TIM_SET_COUNTER(TimEncoder,0);
+                                                uint16_t currentCount = __HAL_TIM_GET_COUNTER(TimEncoder);
+                                                int32_t offset = ENCODER_MID_VALUE - currentCount;
+                                                CallSteps = abs(globalPosition + offset);
+
+                                                // Сбрасываем глобальную позицию и счетчик
+                                                globalPosition = 0;
+                                                __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
                                             }
                                             settings->sensors_map.detected = true;
                                             settings->points.is_calibrated = true;
@@ -789,7 +852,8 @@ bool extern_driver::Calibration_pool() {
             }
             else
             {
-            	__HAL_TIM_SET_COUNTER(TimEncoder,0);
+                __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                globalPosition = 0; // Измеряем с нуля
             }
             startForCall(dir::CW);
 
@@ -799,11 +863,18 @@ bool extern_driver::Calibration_pool() {
                         if(HAL_GPIO_ReadPin(D0_GPIO_Port, D0_Pin) == GPIO_PIN_SET) {
                         	CallSteps = getCurrentSteps();
                             if(settings->mod_rotation ==  mode_rotation_t::calibration_timer){
+                            	CallSteps = getCurrentSteps();
                             	__HAL_TIM_SET_COUNTER(TimCountAllSteps,0);
                             }
                             else
                             {
-                            	__HAL_TIM_SET_COUNTER(TimEncoder,0);
+                                uint16_t currentCount = __HAL_TIM_GET_COUNTER(TimEncoder);
+                                int32_t offset = ENCODER_MID_VALUE - currentCount;
+                                CallSteps = abs(globalPosition + offset);
+
+                                // Сбрасываем глобальную позицию и счетчик
+                                globalPosition = 0;
+                                __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
                             }
                             settings->sensors_map.detected = true;
                             settings->points.is_calibrated = true;
@@ -1177,8 +1248,19 @@ bool extern_driver::validatePointNumber(uint32_t point_number) {
 }
 
 void extern_driver::updateCurrentPosition(uint32_t pos) {
-	__HAL_TIM_SET_COUNTER(TimCountAllSteps, pos);
-	__HAL_TIM_SET_COUNTER(TimEncoder, pos);
+    switch (settings->mod_rotation) {
+        case calibration_enc:
+        case step_by_meter_enc_intermediate:
+            // Для энкодера обновляем globalPosition и сбрасываем счетчик на среднее значение
+            globalPosition = pos;
+            __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+            break;
+        default:
+            // Для других режимов используем стандартное обновление
+            __HAL_TIM_SET_COUNTER(TimCountAllSteps, pos);
+            __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+            break;
+    }
 }
 
 bool extern_driver::saveCurrentPositionAsPoint(uint32_t point_number) {
@@ -1193,34 +1275,33 @@ bool extern_driver::saveCurrentPositionAsPoint(uint32_t point_number) {
     return true;
 }
 
+// Получение текущей абсолютной позиции
 uint32_t extern_driver::getCurrentSteps() {
-	uint32_t ret = 0;
+    uint32_t ret = 0;
 
- 	switch (settings->mod_rotation) {
-		case step_by_meter_timer_intermediate:
-		//case step_by_meter_timer_limit:
-		case calibration_timer:
-		{
-			ret = __HAL_TIM_GET_COUNTER(TimCountAllSteps);
-			break;
-		}
-		case step_by_meter_enc_intermediate:
-		//case step_by_meter_enc_limit:
-		case calibration_enc:
-		{
-			ret = __HAL_TIM_GET_COUNTER(TimEncoder);
-			break;
-		}
-		case bldc_limit:
-		case step_inf:
-    	case bldc_inf:
-		default:
-		{
-			break;
-		}
+    switch (settings->mod_rotation) {
+        case step_by_meter_timer_intermediate:
+        case calibration_timer:
+        {
+            ret = __HAL_TIM_GET_COUNTER(TimCountAllSteps);
+            break;
+        }
+        case step_by_meter_enc_intermediate:
+        case calibration_enc:
+        {
+        	ret = globalPosition;
+            break;
+        }
+        case bldc_limit:
+        case step_inf:
+        case bldc_inf:
+        default:
+        {
+            break;
+        }
     }
 
- 	return ret;
+    return ret;
 }
 
 bool extern_driver::gotoPoint(uint32_t point_number) {
@@ -1299,17 +1380,29 @@ bool extern_driver::gotoLSwitch(uint8_t sw_x) {
         switch (settings->mod_rotation) {
         	case calibration_enc:
         	case step_by_meter_enc_intermediate:
-        	//case step_by_meter_enc_limit:
         	{
-        		//__HAL_TIM_SET_AUTORELOAD(TimFrequencies, settings->StartSpeed);
-        		SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
+                SET_TIM_ARR_AND_PULSE(TimFrequencies, ChannelClock, rampTables.accelTable[0]);
 
-    			//__HAL_TIM_SET_COUNTER(TimEncoder, 0);
-    			__HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
-    			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0xffff);
-    			__HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0xffff);
-        		Status = statusMotor::ACCEL;
-        		break;
+                // Для энкодера используем новый механизм
+                __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                __HAL_TIM_SET_AUTORELOAD(TimEncoder, 0xffff);
+
+                // Отключаем каналы сравнения для бесконечного движения к концевику
+                // Устанавливаем их в максимально удаленные значения
+                if(temp_diretion == dir::CCW) {
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0xFFFF);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0xFFFF);
+                } else {
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, 0);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, 0);
+                }
+
+                // Включаем обработку событий
+                HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_3);
+                HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_4);
+
+                Status = statusMotor::ACCEL;
+                break;
         	}
         	case step_inf:
         	case calibration_timer:
@@ -1379,28 +1472,52 @@ void extern_driver::setPoint(uint32_t point, uint32_t abs_steps){
 }
 
 bool extern_driver::gotoPosition(uint32_t position) {
-    if(!validatePosition(position)) {
+    if (!validatePosition(position)) {
         STM_LOG("Invalid position requested: %lu", position);
         return false;
     }
 
     // Проверяем состояние драйвера
-    if(getDriverStatus() != DRIVER_OK) {
+    if (getDriverStatus() != DRIVER_OK) {
         STM_LOG("Driver error, cannot move");
         return false;
     }
 
-    // Определяем направление движения
-    if(position > getCurrentSteps()) {
-        settings->Direct = dir::CCW;
-    } else if(position < getCurrentSteps()) {
-        settings->Direct = dir::CW;
-    } else {
-        // Уже в заданной позиции
+    // Получаем текущую позицию
+    uint32_t currentPosition = getCurrentSteps();
+
+    // Если уже в заданной позиции, ничего не делаем
+    if (position == currentPosition) {
+        STM_LOG("Already at requested position: %lu", position);
         return true;
     }
 
-    return start(position);
+    // Определяем направление движения
+    dir targetDirection;
+    uint32_t stepsToMove;
+
+    if (position > currentPosition) {
+        targetDirection = dir::CCW;
+        stepsToMove = position - currentPosition;
+        STM_LOG("Moving CCW: %lu steps to position %lu", stepsToMove, position);
+    } else {
+        targetDirection = dir::CW;
+        stepsToMove = currentPosition - position;
+        STM_LOG("Moving CW: %lu steps to position %lu", stepsToMove, position);
+    }
+
+    // Устанавливаем направление
+    settings->Direct = targetDirection;
+
+    // Для режимов энкодера фиксируем целевую позицию, чтобы правильно обрабатывать остановку
+    if (settings->mod_rotation == step_by_meter_enc_intermediate ||
+        settings->mod_rotation == calibration_enc) {
+        // Запоминаем целевую абсолютную позицию для проверки в обработчике
+        targetAbsolutePosition = position;
+    }
+
+    // Вызываем метод start, передавая количество шагов, которые нужно пройти
+    return start(stepsToMove, targetDirection);
 }
 
 
@@ -1827,6 +1944,176 @@ extern_driver::extern_driver(settings_t *set, TIM_HandleTypeDef *timCount,
 				channelFreq), debounceTimer(timDebounce), TimEncoder(timENC) {
 }
 
+// Обработка события сравнения энкодера
+void extern_driver::handleEncoderCompare(uint32_t channel) {
+    uint16_t currentCount = __HAL_TIM_GET_COUNTER(TimEncoder);
+
+    if(channel == TIM_CHANNEL_3) {
+        // Канал 3 = начало торможения
+        slowdown();
+    }
+    else if(channel == TIM_CHANNEL_4) {
+        // Канал 4 = конец части или полная остановка
+
+        // Обновление глобальной позиции на основе движения
+        if(settings->Direct == dir::CCW) {
+            // Движение CCW (увеличение счетчика)
+            int32_t increment = currentCount - ENCODER_MID_VALUE;
+            globalPosition += increment;
+        } else {
+            // Движение CW (уменьшение счетчика)
+            int32_t decrement = ENCODER_MID_VALUE - currentCount;
+            globalPosition -= decrement;
+        }
+
+        if(isLastEncoderPart) {
+            // Это была последняя часть - останавливаем двигатель
+            stop(statusTarget_t::finished);
+
+            // Корректируем позицию, если есть расхождение с целевой
+            uint32_t finalPosition = getCurrentSteps();
+            if (abs((int32_t)finalPosition - (int32_t)targetAbsolutePosition) <= 5) {
+                // Если разница небольшая, корректируем точно до целевой позиции
+                if (settings->mod_rotation == step_by_meter_enc_intermediate ||
+                    settings->mod_rotation == calibration_enc) {
+                    globalPosition = targetAbsolutePosition;
+                    __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+                    STM_LOG("Position corrected to exact target: %lu", targetAbsolutePosition);
+                }
+            }
+        } else {
+            // Осталось пройти больше частей - сбрасываем счетчик и продолжаем
+            // Отнимаем пройденную часть от общего оставшегося пути
+            if(settings->Direct == dir::CCW) {
+                totalRemainingSteps -= (currentCount - ENCODER_MID_VALUE);
+            } else {
+                totalRemainingSteps -= (ENCODER_MID_VALUE - currentCount);
+            }
+
+            // Сброс счетчика на середину
+            __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+
+            if(totalRemainingSteps <= ENCODER_MAX_PART) {
+                // Последняя часть - включаем торможение
+                isLastEncoderPart = true;
+
+                if(settings->Direct == dir::CCW) {
+                    uint16_t brakePoint = ENCODER_MID_VALUE + (totalRemainingSteps - rampTables.decelSteps);
+                    uint16_t stopPoint = ENCODER_MID_VALUE + totalRemainingSteps;
+
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, brakePoint);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, stopPoint);
+                } else {
+                    uint16_t brakePoint = ENCODER_MID_VALUE - (totalRemainingSteps - rampTables.decelSteps);
+                    uint16_t stopPoint = ENCODER_MID_VALUE - totalRemainingSteps;
+
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, brakePoint);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, stopPoint);
+                }
+            } else {
+                // Еще одна промежуточная часть
+                if(settings->Direct == dir::CCW) {
+                    uint16_t nextPartEnd = ENCODER_MID_VALUE + ENCODER_MAX_PART;
+
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, nextPartEnd);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, nextPartEnd);
+                } else {
+                    uint16_t nextPartEnd = ENCODER_MID_VALUE - ENCODER_MAX_PART;
+
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, nextPartEnd);
+                    __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, nextPartEnd);
+                }
+            }
+        }
+    }
+}
+
+// Разбивает движение на части и настраивает таймер
+void extern_driver::setupEncoderMovement(uint32_t totalSteps, dir direction) {
+    // Сброс счетчика на среднюю позицию
+    __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+
+    // Сохраняем общее количество шагов
+    totalRemainingSteps = totalSteps;
+
+    // Рассчитываем, нужно ли разбивать на части
+    if(totalSteps <= ENCODER_MAX_PART) {
+        // Движение одной частью
+        isLastEncoderPart = true;
+
+        if(direction == dir::CCW) {
+            // Движение CCW (увеличение счетчика)
+            uint16_t brakePoint = ENCODER_MID_VALUE + (totalSteps - rampTables.decelSteps);
+            uint16_t stopPoint = ENCODER_MID_VALUE + totalSteps;
+
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, brakePoint);
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, stopPoint);
+        } else {
+            // Движение CW (уменьшение счетчика)
+            uint16_t brakePoint = ENCODER_MID_VALUE - (totalSteps - rampTables.decelSteps);
+            uint16_t stopPoint = ENCODER_MID_VALUE - totalSteps;
+
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, brakePoint);
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, stopPoint);
+        }
+    } else {
+        // Многочастное движение
+        isLastEncoderPart = false;
+
+        if(direction == dir::CCW) {
+            // Первая часть - используем только канал 4 для завершения части
+            uint16_t firstPartEnd = ENCODER_MID_VALUE + ENCODER_MAX_PART;
+
+            // Отключаем канал 3, установив его в то же значение, что и канал 4
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, firstPartEnd);
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, firstPartEnd);
+        } else {
+            // Первая часть - используем только канал 4 для завершения части
+            uint16_t firstPartEnd = ENCODER_MID_VALUE - ENCODER_MAX_PART;
+
+            // Отключаем канал 3, установив его в то же значение, что и канал 4
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_3, firstPartEnd);
+            __HAL_TIM_SET_COMPARE(TimEncoder, TIM_CHANNEL_4, firstPartEnd);
+        }
+    }
+
+    // Включаем каналы прерывания
+    HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_3);
+    HAL_TIM_OC_Start_IT(TimEncoder, TIM_CHANNEL_4);
+}
+
+void extern_driver::updateEncoderGlobalPosition() {
+    // Только для режимов с энкодером
+    if (settings->mod_rotation != step_by_meter_enc_intermediate &&
+        settings->mod_rotation != calibration_enc) {
+        return;
+    }
+
+    // Только если мотор движется
+    if (Status == statusMotor::STOPPED) {
+        return;
+    }
+
+    uint16_t currentCount = __HAL_TIM_GET_COUNTER(TimEncoder);
+
+    // Если счетчик близок к краям диапазона, обновляем глобальную позицию и сбрасываем счетчик
+    if (currentCount < 0x1000 || currentCount > 0xF000) {
+        if (settings->Direct == dir::CCW) {
+            // Движение CCW (увеличение счетчика)
+            int32_t increment = currentCount - ENCODER_MID_VALUE;
+            globalPosition += increment;
+        } else {
+            // Движение CW (уменьшение счетчика)
+            int32_t decrement = ENCODER_MID_VALUE - currentCount;
+            globalPosition -= decrement;
+        }
+
+        // Сброс счетчика на середину
+        __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
+
+        //STM_LOG("globalPosition: %d", globalPosition);
+    }
+}
 /*
  *
  *

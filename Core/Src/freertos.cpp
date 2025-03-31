@@ -319,7 +319,8 @@ void motor_pool(void const * argument)
 
 		// проверять концевики. если мотор не стоит и концевик включен то экстренно остановить
 		pMotor->limit_switch_pool();
-
+        // Обновление глобальной позиции для энкодера
+        //pMotor->updateEncoderGlobalPosition();
 		//osDelayUntil(&tickcount, 1); // задача будет вызываься ровно через 1 милисекунду
 		osDelay(1);
 	}

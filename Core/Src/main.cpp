@@ -621,7 +621,6 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     {
     	switch (settings.mod_rotation) {
     		case step_by_meter_enc_intermediate:
-    		//case step_by_meter_enc_limit:
     		case calibration_enc:
     		{
 				switch(htim->Channel)
@@ -637,15 +636,15 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 								// Прерывание от канала 2
 								break;
 
-							case HAL_TIM_ACTIVE_CHANNEL_3:
-								// Прерывание от канала 3
-								pMotor->slowdown();
-								break;
+		                    case HAL_TIM_ACTIVE_CHANNEL_3:
+		                        // Событие канала 3 - начало торможения
+		                        pMotor->handleEncoderCompare(TIM_CHANNEL_3);
+		                        break;
 
-							case HAL_TIM_ACTIVE_CHANNEL_4:
-								// Прерывание от канала 4
-								pMotor->stop(statusTarget_t::finished);
-								break;
+		                    case HAL_TIM_ACTIVE_CHANNEL_4:
+		                        // Событие канала 4 - завершение части или остановка
+		                        pMotor->handleEncoderCompare(TIM_CHANNEL_4);
+		                        break;
 
 							case HAL_TIM_ACTIVE_CHANNEL_CLEARED:
 								// Нет активного канала

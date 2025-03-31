@@ -135,7 +135,21 @@ public:
     void HandleDebounceTimeout();
     void handleTimerInterrupt();
 
+    void setupEncoderMovement(uint32_t totalSteps, dir direction);
+    void handleEncoderCompare(uint32_t channel);
+    void updateGlobalPosition();
+    void updateEncoderGlobalPosition();// Периодическое обновление глобальной позиции во время движения
+
 private:
+    // Для отслеживания абсолютной позиции
+    int32_t globalPosition = 0;
+    uint32_t targetAbsolutePosition = 0; // Для хранения целевой абсолютной позиции
+    const uint16_t ENCODER_MID_VALUE = 0x7FFF; // 32767 (середина 16-битного диапазона)
+    const uint16_t ENCODER_MAX_PART = 0x6000;  // Максимальное движение в одной части (~24,000)
+    bool isLastEncoderPart = false;            // Флаг последней части
+    uint32_t totalRemainingSteps = 0;          // Оставшиеся шаги для движения
+
+
     //void updateCurrentSteps(int32_t steps);
     bool validatePointNumber(uint32_t point_number);
     //void updateMotionCounter();
@@ -225,7 +239,7 @@ private:
     uint32_t timerTickFreq;  // Частота тактирования таймера с учетом предделителя
 
     // Максимальное количество шагов в таблице разгона/торможения
-    static const uint16_t MAX_RAMP_STEPS = 200;
+    static const uint16_t MAX_RAMP_STEPS = 1000;
 
     // Структура для таблиц разгона и торможения
     struct {
