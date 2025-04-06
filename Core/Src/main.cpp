@@ -54,6 +54,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__((section(".ccmram"))) = {0};
 uint32_t count_tic = 0; //для замеров времени выполнения кода
 extern TIM_HandleTypeDef htim3;
 //TIM_HandleTypeDef no;
@@ -684,15 +685,13 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     	        switch(htim->Channel)
     	                {
     	                    case HAL_TIM_ACTIVE_CHANNEL_1:
-    	                    	// канал торможения
-    	                    	//pMotor->StepsAllHandler(__HAL_TIM_GET_COUNTER(htim));
-    	                    	pMotor->slowdown();
+    	                        // Вызываем обработчик для канала 1 (начало торможения)
+    	                        pMotor->handleTimerCompare(TIM_CHANNEL_1);
     	                        break;
 
     	                    case HAL_TIM_ACTIVE_CHANNEL_2:
-    	                    	//канал остановки
-    	                    	pMotor->stop(statusTarget_t::finished);
-    	                        // Прерывание от канала 2
+    	                        // Вызываем обработчик для канала 2 (остановка или конец части)
+    	                        pMotor->handleTimerCompare(TIM_CHANNEL_2);
     	                        break;
 
     	                    case HAL_TIM_ACTIVE_CHANNEL_3:

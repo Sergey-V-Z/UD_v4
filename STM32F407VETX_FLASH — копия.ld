@@ -169,13 +169,6 @@ SECTIONS
     _eccmram = .;       /* create a global symbol at ccmram end */
   } >CCMRAM AT> FLASH
 
-  .ccmram :
-  {
-    . = ALIGN(8);
-    . = . + _Min_Heap_Size;
-    . = ALIGN(8);
-  } >CCMRAM
-
   /* Uninitialized data section into "RAM" Ram type memory */
   . = ALIGN(4);
   .bss :
@@ -198,7 +191,7 @@ SECTIONS
     . = ALIGN(8);
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
-    /*. = . + _Min_Heap_Size;*/
+    . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
   } >RAM

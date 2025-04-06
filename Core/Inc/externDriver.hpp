@@ -140,6 +140,11 @@ public:
     void updateGlobalPosition();
     void updateEncoderGlobalPosition();// Периодическое обновление глобальной позиции во время движения
 
+    // Методы для работы с 32-битной позицией в режиме таймера
+    void updateTimerGlobalPosition();
+    void setupTimerMovement(uint32_t totalSteps, dir direction);
+    void handleTimerCompare(uint32_t channel);
+
 private:
     // Для отслеживания абсолютной позиции
     int32_t globalPosition = 0;
@@ -149,6 +154,11 @@ private:
     bool isLastEncoderPart = false;            // Флаг последней части
     uint32_t totalRemainingSteps = 0;          // Оставшиеся шаги для движения
 
+    // Для отслеживания абсолютной позиции в режиме таймера
+    int32_t globalPositionTimer = 0;          // 32-битная глобальная позиция для таймера
+    const uint16_t TIMER_MID_VALUE = 0x7FFF;  // Среднее значение для таймера (аналогично энкодеру)
+    const uint16_t TIMER_MAX_PART = 0x6000;   // Максимальное движение в одной части
+    bool isLastTimerPart = true;              // Флаг последней части движения для таймера
 
     //void updateCurrentSteps(int32_t steps);
     bool validatePointNumber(uint32_t point_number);
