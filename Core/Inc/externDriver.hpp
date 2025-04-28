@@ -220,7 +220,7 @@ private:
     // Параметры движения
     uint32_t MaxSpeed = 1;
     uint32_t MinSpeed = 20000;
-    uint32_t Time = 0;
+    uint32_t startTime_forTimOut = 0;
     uint8_t TimerIsStart = false;
     uint32_t PrevCounterENC = 0;
     uint8_t countErrDir = 3;
@@ -244,7 +244,7 @@ private:
     bool permission_calibrate = false;
     bool permission_findHome = false;
     bool change_pos = false;
-    uint32_t time = 0;
+    //uint32_t time = 0;
     uint8_t bos_bit = 0;
     uint32_t timerTickFreq;  // Частота тактирования таймера с учетом предделителя
 

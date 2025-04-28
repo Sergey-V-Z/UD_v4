@@ -357,6 +357,9 @@ bool extern_driver::start(uint32_t steps, dir d) {
         HAL_GPIO_WritePin(EN_GPIO_Port, EN_Pin, GPIO_PIN_RESET); // Включение драйвера
         HAL_TIM_OC_Start_IT(TimFrequencies, ChannelClock);
 
+        TimerIsStart = true;
+        startTime_forTimOut = HAL_GetTick();
+
         return true;
     } else {
         STM_LOG("Fail started motor.");
@@ -496,7 +499,7 @@ void extern_driver::stop(statusTarget_t status) {
 
     StatusTarget = status;
     TimerIsStart = false;
-    Time = 0;
+    startTime_forTimOut = HAL_GetTick();
 /*
     switch (settings->mod_rotation) {
     	case by_meter_timer_intermediate:
@@ -656,9 +659,9 @@ void extern_driver::SensHandler(uint16_t GPIO_Pin) {
                     if (settings->mod_rotation == step_by_meter_enc_intermediate) {
                         // Для энкодера сбрасываем на среднее значение и устанавливаем максимальное значение
                         __HAL_TIM_SET_COUNTER(TimEncoder, ENCODER_MID_VALUE);
-                        //globalPosition = CallSteps;
+                        globalPosition = CallSteps;
                     } else {
-                        //updateCurrentPosition(CallSteps);
+                        updateCurrentPosition(CallSteps);
                     }
                     settings->points.current_point = 9;
                 }
@@ -715,9 +718,10 @@ void extern_driver::checkEncoderDirection() {
 
         PrevCounterENC = TimEncoder->Instance->CNT;    // Обновление предыдущего значения энкодера
         TimerIsStart = false;                          // Сброс таймера
-        Time = 0;
+        startTime_forTimOut = HAL_GetTick();
     } else {
         TimerIsStart = true;                           // Запуск таймера если нет движения
+        startTime_forTimOut = HAL_GetTick();
     }
 }
 
@@ -733,7 +737,7 @@ void extern_driver::checkEncoderMotion() {
     } else {
         PrevCounterENC = TimEncoder->Instance->CNT;    // Обновление предыдущего значения
         TimerIsStart = false;                          // Сброс таймера
-        Time = 0;
+        startTime_forTimOut = HAL_GetTick();
     }
 }
 
@@ -971,6 +975,14 @@ bool extern_driver::limit_switch_pool() {
 			}
 
 			stop(statusTarget_t::errLimitSwitch);
+		}
+	}
+	// если истек тамаут то останавливаем
+	if(TimerIsStart)
+	{
+		if((startTime_forTimOut + settings->TimeOut) > HAL_GetTick())
+		{
+			stop(statusTarget_t::errMotion);
 		}
 	}
 
