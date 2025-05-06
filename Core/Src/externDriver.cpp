@@ -734,6 +734,7 @@ void extern_driver::checkEncoderMotion() {
     if (((PrevCounterENC + 100) >= TimEncoder->Instance->CNT)
         && (TimEncoder->Instance->CNT >= (PrevCounterENC - 100))) {
         TimerIsStart = true;                           // Запуск таймера при отсутствии движения
+        startTime_forTimOut = HAL_GetTick();
     } else {
         PrevCounterENC = TimEncoder->Instance->CNT;    // Обновление предыдущего значения
         TimerIsStart = false;                          // Сброс таймера
@@ -980,7 +981,7 @@ bool extern_driver::limit_switch_pool() {
 	// если истек тамаут то останавливаем
 	if(TimerIsStart)
 	{
-		if((startTime_forTimOut + settings->TimeOut) > HAL_GetTick())
+		if((startTime_forTimOut + settings->TimeOut) <= HAL_GetTick())
 		{
 			stop(statusTarget_t::errMotion);
 		}
