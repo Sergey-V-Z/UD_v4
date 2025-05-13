@@ -172,6 +172,7 @@ int main(void)
 	// если установлен джампер set
 	// заходим в режим настройки
 	bool StartSettings = false;
+	/*
 	for (int var = 0; var < 5; ++var) {
 
 		if(HAL_GPIO_ReadPin(MAC_IP_Pin_GPIO_Port, MAC_IP_Pin_Pin)){
@@ -182,7 +183,7 @@ int main(void)
 		}
 
 		HAL_Delay(30);
-	}
+	}*/
 
 	//режим настройки
 	if(StartSettings){
@@ -456,7 +457,7 @@ static int getFreeMessageSlot(void) {
     return -1;
 }
 
-// �?нициализация логгера
+// инициализация логгера
 void Logger_Init(UART_HandleTypeDef* huart) {
     // Сохраняем указатель на UART
     logger.huart = huart;
